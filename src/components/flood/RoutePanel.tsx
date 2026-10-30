@@ -287,8 +287,10 @@ export default function RoutePanel({
               <div className="rounded-xl border-2 border-sky-500 dark:border-sky-600 bg-sky-50/60 dark:bg-sky-950/30 p-3.5 space-y-2.5 shadow-xs">
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-0.5 min-w-0">
-                    <Badge className="bg-sky-600 text-white text-[10px] font-bold px-2 py-0 mb-1">
-                      ★ Recommended Safest Shelter
+                    <Badge className={`${recommendedShelterCandidate.route?.safetyStatus === "Impassable" ? "bg-red-600" : "bg-sky-600"} text-white text-[10px] font-bold px-2 py-0 mb-1`}>
+                      {recommendedShelterCandidate.route?.safetyStatus === "Impassable"
+                        ? "⚠️ No Passable Route to Shelter – Stay on High Ground"
+                        : "★ Recommended Safest Shelter"}
                     </Badge>
                     <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">
                       {recommendedShelterCandidate.shelter.name}

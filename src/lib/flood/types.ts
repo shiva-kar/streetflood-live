@@ -1,4 +1,5 @@
 export type RiskLevel = "Low" | "Moderate" | "High" | "Critical";
+export type RoadRiskLevel = "Low" | "Moderate" | "High" | "Critical" | "Closed" | "Unassessed";
 export type PredictedRiskLevel = "Low" | "Moderate";
 export type WaterDepth = "Footpath" | "Ankles" | "Knees" | "WaistPlus";
 export type ReportStatus = "Unverified" | "Verified" | "Dismissed";
@@ -137,7 +138,7 @@ export interface RoadSegment {
   id: string;
   name: string;
   coordinates: [number, number][]; // [lat, lng][]
-  riskLevel: RiskLevel;
+  riskLevel: RoadRiskLevel;
   waterDepth?: WaterDepth;
   statusDescription?: string;
   closure?: IncidentStatus;

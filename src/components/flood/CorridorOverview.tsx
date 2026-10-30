@@ -1,4 +1,5 @@
 import {
+  X,
   MapPin,
   ShieldAlert,
   CloudRain,
@@ -22,6 +23,7 @@ interface CorridorOverviewProps {
   onOpenReport: () => void;
   onOpenRoute: () => void;
   onOpenPreparedness: () => void;
+  onClose?: () => void;
 }
 
 export default function CorridorOverview({
@@ -32,6 +34,7 @@ export default function CorridorOverview({
   onOpenReport,
   onOpenRoute,
   onOpenPreparedness,
+  onClose,
 }: CorridorOverviewProps) {
   const criticalCount = tiles.filter((t) => t.currentRiskLevel === "Critical").length;
   const highCount = tiles.filter((t) => t.currentRiskLevel === "High").length;
@@ -42,15 +45,30 @@ export default function CorridorOverview({
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden">
       {/* Overview Header */}
       <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 shrink-0">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-sky-600 text-white font-bold text-xs px-2.5 py-0.5">
-            Live Monitoring
-          </Badge>
-          <span className="text-xs text-slate-500 font-medium">MCGM Corridor Zone</span>
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-sky-600 text-white font-bold text-xs px-2.5 py-0.5">
+                Live Monitoring
+              </Badge>
+              <span className="text-xs text-slate-500 font-medium">MCGM Corridor Zone</span>
+            </div>
+            <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-slate-100 mt-1">
+              Sion–Kurla Flood Corridor
+            </h2>
+          </div>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              title="Close panel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
-        <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-slate-100 mt-1">
-          Sion–Kurla Flood Corridor
-        </h2>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
           Select any 100m² tile on the map to inspect street flood severity and 3h predictions.
         </p>

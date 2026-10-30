@@ -114,6 +114,29 @@ export const SION_KURLA_ROAD_NETWORK = {
         [19.0545, 72.864],
       ] as [number, number][],
     },
+    {
+      id: "sion_circle_to_hospital",
+      from: "sionCircle",
+      to: "sionHospital",
+      name: "Sion Hospital Road",
+      points: [
+        [19.0435, 72.8625],
+        [19.0442, 72.8638],
+        [19.0448, 72.8647],
+        [19.0455, 72.8655],
+      ] as [number, number][],
+    },
+    {
+      id: "bkc_to_mithi",
+      from: "bkcConnectorJn",
+      to: "kurlaMithiEdge",
+      name: "BKC Connector (West Link)",
+      points: [
+        [19.0525, 72.8685],
+        [19.0535, 72.8662],
+        [19.0545, 72.864],
+      ] as [number, number][],
+    },
   ],
 };
 
@@ -366,23 +389,66 @@ export function getCorridorFallbackRoute(
   reports: FloodReport[],
   incidents: RoadIncident[],
 ): RoadRouteResult {
-  // Connect through real mapped road corridor vertices
-  const pts: [number, number][] = [[from.lat, from.lng]];
+  // Find nearest intersection in graph to start and end
+  let startNodeKey = "sionHospital";
+  let minStartDist = Infinity;
+  let endNodeKey = "lbsMargJunction";
+  let minEndDist = Infinity;
 
-  // Find intermediate corridor nodes
-  for (const c of SION_KURLA_ROAD_NETWORK.corridors) {
-    const dStart = distanceKm(from.lat, from.lng, c.points[0][0], c.points[0][1]);
-    const dEnd = distanceKm(
-      to.lat,
-      to.lng,
-      c.points[c.points.length - 1][0],
-      c.points[c.points.length - 1][1],
-    );
-    if (dStart < 1.2 || dEnd < 1.2) {
-      pts.push(...c.points);
+  const intersections = SION_KURLA_ROAD_NETWORK.intersections;
+  for (const [key, node] of Object.entries(intersections)) {
+    const dFrom = distanceKm(from.lat, from.lng, node.lat, node.lng);
+    if (dFrom < minStartDist) {
+      minStartDist = dFrom;
+      startNodeKey = key;
+    }
+    const dTo = distanceKm(to.lat, to.lng, node.lat, node.lng);
+    if (dTo < minEndDist) {
+      minEndDist = dTo;
+      endNodeKey = key;
     }
   }
 
+  // Build adjacency graph of connected corridors
+  const adj = new Map<string, { target: string; points: [number, number][]; name: string }[]>();
+  for (const [key] of Object.entries(intersections)) adj.set(key, []);
+
+  for (const c of SION_KURLA_ROAD_NETWORK.corridors) {
+    adj.get(c.from)?.push({ target: c.to, points: c.points, name: c.name });
+    adj.get(c.to)?.push({ target: c.from, points: [...c.points].reverse(), name: c.name });
+  }
+
+  // BFS shortest path on road corridor network
+  const queue: { node: string; path: { points: [number, number][]; name: string }[] }[] = [
+    { node: startNodeKey, path: [] },
+  ];
+  const visited = new Set<string>([startNodeKey]);
+  let foundPath: { points: [number, number][]; name: string }[] | null = null;
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (cur.node === endNodeKey) {
+      foundPath = cur.path;
+      break;
+    }
+    for (const edge of adj.get(cur.node) || []) {
+      if (!visited.has(edge.target)) {
+        visited.add(edge.target);
+        queue.push({ node: edge.target, path: [...cur.path, edge] });
+      }
+    }
+  }
+
+  const pts: [number, number][] = [[from.lat, from.lng]];
+  if (foundPath && foundPath.length > 0) {
+    for (const segment of foundPath) {
+      pts.push(...segment.points);
+    }
+  } else {
+    // If same node or direct, connect through entry node
+    const n = intersections[startNodeKey as keyof typeof intersections];
+    if (n) pts.push([n.lat, n.lng]);
+  }
   pts.push([to.lat, to.lng]);
 
   // Remove immediate duplicate points

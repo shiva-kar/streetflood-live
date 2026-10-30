@@ -135,9 +135,7 @@
   z-index: 1 !important;
 }
 
-.leaflet-pane {
-  z-index: 10 !important;
-}
+/* Leaflet handles pane hierarchy natively */
 
 .leaflet-top,
 .leaflet-bottom {

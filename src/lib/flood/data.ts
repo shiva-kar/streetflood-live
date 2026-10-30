@@ -77,7 +77,7 @@ export const SHELTERS: Shelter[] = [
   {
     id: "sh1",
     name: "Demo Shelter A – Municipal School",
-    address: "Near Sion Hospital Rd, Sion (simulated)",
+    address: "Sion East / SIES College Area (simulated)",
     lat: 19.0455,
     lng: 72.8655,
     kind: "School",
@@ -110,9 +110,9 @@ export const SHELTERS: Shelter[] = [
   {
     id: "sh4",
     name: "Demo Shelter D – Secondary School",
-    address: "Kurla, Mithi river side (simulated)",
+    address: "Kurla West / CST Road corridor (simulated)",
     lat: 19.0565,
-    lng: 72.8655,
+    lng: 72.8715,
     kind: "School",
     capacityStatus: "Near capacity",
     provenance: "Simulated Demo",

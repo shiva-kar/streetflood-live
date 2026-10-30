@@ -7,6 +7,7 @@ import {
   type StaticRoadCorridor,
 } from "@/lib/flood/data";
 import { distanceKm, tileBounds, tileAt } from "@/lib/flood/engine";
+import { SION_KURLA_OSM_ROADS, evaluateOsmRoadRisk } from "@/lib/flood/osmNetwork";
 import type {
   FloodReport,
   MapLayerOptions,
@@ -84,7 +85,21 @@ export default function FloodMap(props: FloodMapProps) {
       preferCanvas: true,
     });
 
-    L.control.zoom({ position: "bottomright" }).addTo(m);
+    // Dedicated panes for clean layer stacking
+    if (!m.getPane("technicalGridPane")) {
+      const p = m.createPane("technicalGridPane");
+      p.style.zIndex = "250";
+    }
+    if (!m.getPane("osmRoadsPane")) {
+      const p = m.createPane("osmRoadsPane");
+      p.style.zIndex = "350";
+    }
+    if (!m.getPane("evacuationRoutePane")) {
+      const p = m.createPane("evacuationRoutePane");
+      p.style.zIndex = "450";
+    }
+
+    L.control.zoom({ position: "bottomleft" }).addTo(m);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -249,7 +264,7 @@ export default function FloodMap(props: FloodMapProps) {
     currentZoom,
   ]);
 
-  // Flood-affected road corridors overlay (Feature 6)
+  // Authoritative OpenStreetMap road network overlay (Feature 6)
   useEffect(() => {
     if (!L) return;
     const g = layers.current.corridors;
@@ -260,102 +275,88 @@ export default function FloodMap(props: FloodMapProps) {
 
     const tileMap = new Map(props.tiles.map((t) => [t.id, t]));
 
-    for (const corr of AFFECTED_ROAD_CORRIDORS) {
-      let maxTier: RiskLevel = "Low";
-      let hasClosure = false;
+    for (const road of SION_KURLA_OSM_ROADS) {
+      // At lower zoom levels, only render major arterials to prevent map clutter
+      if (!road.isMajor && currentZoom < 15) continue;
 
-      for (const [lat, lng] of corr.coordinates) {
-        const tId = tileAt(lat, lng);
-        const tile = tId ? tileMap.get(tId) : null;
-        if (tile) {
-          if (tile.currentRiskLevel === "Critical") maxTier = "Critical";
-          else if (tile.currentRiskLevel === "High" && maxTier !== "Critical") maxTier = "High";
-          else if (tile.currentRiskLevel === "Moderate" && maxTier === "Low") maxTier = "Moderate";
-          if (tile.closure === "ClosedAllTraffic") hasClosure = true;
-        }
-      }
+      const evalResult = evaluateOsmRoadRisk(road, tileMap, props.incidents, props.reports);
+      const { riskLevel, severityScore, reason } = evalResult;
 
-      // Check proximity to official incidents
-      for (const inc of props.incidents) {
-        if (inc.status === "ClosedAllTraffic") {
-          const incTile = tileMap.get(inc.tileId);
-          if (incTile) {
-            for (const [lat, lng] of corr.coordinates) {
-              if (distanceKm(lat, lng, incTile.centerLat, incTile.centerLng) < 0.1) {
-                hasClosure = true;
-              }
-            }
-          }
-        }
-      }
+      // For Low risk roads at broad zoom (< 16), let the clean OSM basemap streets show naturally
+      if (riskLevel === "Low" && currentZoom < 16) continue;
 
-      let strokeColor = "#10b981"; // Low/Normal
-      let weight = 4;
+      let strokeColor = "#16a34a"; // Low
+      let weight = 2.5;
+      let opacity = 0.55;
       let dashArray: string | undefined = undefined;
 
-      if (hasClosure) {
+      if (riskLevel === "Closed") {
         strokeColor = "#dc2626";
-        weight = 7;
-        dashArray = "6, 6";
-      } else if (maxTier === "Critical") {
-        strokeColor = "#ef4444";
-        weight = 7;
-      } else if (maxTier === "High") {
-        strokeColor = "#f97316";
-        weight = 5.5;
-      } else if (maxTier === "Moderate") {
-        strokeColor = "#f59e0b";
         weight = 4.5;
+        opacity = 1.0;
+        dashArray = "6, 6";
+      } else if (riskLevel === "Critical") {
+        strokeColor = "#dc2626";
+        weight = 4.0;
+        opacity = 0.95;
+      } else if (riskLevel === "High") {
+        strokeColor = "#ea580c";
+        weight = 3.5;
+        opacity = 0.9;
+      } else if (riskLevel === "Moderate") {
+        strokeColor = "#eab308";
+        weight = 3.0;
+        opacity = 0.85;
+      } else if (riskLevel === "Unassessed") {
+        strokeColor = "#94a3b8";
+        weight = 1.5;
+        opacity = 0.25;
+        dashArray = "4, 4";
       }
 
-      // White outline halo for high contrast against OpenStreetMap streets
-      L.polyline(corr.coordinates, {
-        color: "#ffffff",
-        weight: weight + 3,
-        opacity: 0.85,
-        interactive: false,
-      }).addTo(g);
-
-      // Main corridor line
-      const line = L.polyline(corr.coordinates, {
+      // Render actual road polyline strictly on the OSM road geometry
+      const line = L.polyline(road.coordinates, {
+        pane: "osmRoadsPane",
         color: strokeColor,
         weight: weight,
-        opacity: 0.95,
+        opacity: opacity,
         dashArray: dashArray,
+        lineCap: "round",
+        lineJoin: "round",
         interactive: true,
       }).addTo(g);
 
       line.bindTooltip(
-        `<div class="p-1 text-xs">
-          <strong>${corr.name}</strong><br/>
-          <span style="color:#64748b;">${corr.roadName}</span><br/>
+        `<div class="p-1.5 text-xs font-sans">
+          <strong class="text-slate-900">${road.name}</strong><br/>
+          <span style="color:#64748b; font-size:11px;">${road.highway.toUpperCase()} • ${road.lengthMeters}m</span><br/>
           <span class="font-bold ${
-            hasClosure
+            riskLevel === "Closed"
               ? "text-red-600"
-              : maxTier === "Critical"
+              : riskLevel === "Critical"
                 ? "text-red-500"
-                : maxTier === "High"
+                : riskLevel === "High"
                   ? "text-orange-500"
-                  : maxTier === "Moderate"
+                  : riskLevel === "Moderate"
                     ? "text-amber-500"
                     : "text-emerald-600"
           }">
-            Status: ${hasClosure ? "⛔ Closed to Traffic" : `${maxTier} Flood Risk`}
+            Status: ${riskLevel === "Closed" ? "⛔ Closed to Traffic" : `${riskLevel} Risk (${severityScore}/100)`}
           </span><br/>
-          <span style="font-size:10px; color:#475569;">${corr.typicalBottleneck}</span>
+          <span style="font-size:10px; color:#475569;">${reason}</span>
         </div>`,
         { sticky: true },
       );
 
       line.on("click", (e) => {
         L.DomEvent.stopPropagation(e);
-        propsRef.current.onRoadCorridorClick?.(corr);
-        const mid = corr.coordinates[Math.floor(corr.coordinates.length / 2)];
-        const id = tileAt(mid[0], mid[1]);
-        if (id) propsRef.current.onTileClick(id, mid[0], mid[1]);
+        if (road.tileIds.length > 0) {
+          const t = tileMap.get(road.tileIds[0]);
+          if (t) propsRef.current.onTileClick(t.id, t.centerLat, t.centerLng);
+        }
       });
     }
-  }, [L, props.tiles, props.incidents, props.layerOptions?.showAffectedRoads]);
+  }, [L, props.tiles, props.incidents, props.reports, props.layerOptions?.showAffectedRoads, currentZoom]);
 
   // Road closures overlay (Dashed red box + hazard pin)
   useEffect(() => {
@@ -544,6 +545,7 @@ export default function FloodMap(props: FloodMapProps) {
 
       // Main road polyline
       L.polyline(pts, {
+        pane: "evacuationRoutePane",
         color: routeColor,
         weight: 5,
         opacity: 1,
