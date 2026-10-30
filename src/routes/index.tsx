@@ -345,6 +345,8 @@ function StreetFloodApp() {
         }}
         onOpenPreparedness={() => setPrepModalOpen(true)}
         onOpenSimulation={() => setSimDrawerOpen(true)}
+        onOpenReport={() => setReportDialogOpen(true)}
+        onSelectZone={handleJumpToZone}
       />
 
       {/* 2. Safety Prototype Notice Banner */}
@@ -475,7 +477,7 @@ function StreetFloodApp() {
           />
 
           {/* Floating Map Controls (Top Left of Map Area) */}
-          <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 max-w-[calc(100%-24px)] pointer-events-auto">
+          <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 max-w-[calc(100%-120px)] sm:max-w-none pointer-events-auto">
             {/* Quick Corridor Jump Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs no-scrollbar">
               <span className="text-[11px] font-bold text-slate-400 uppercase shrink-0">Jump:</span>
@@ -526,46 +528,86 @@ function StreetFloodApp() {
             </div>
           </div>
 
-          {/* Floating Bottom Action Buttons (Bottom Left of Map) */}
-          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 pointer-events-auto">
-            {/* Report Flooding FAB */}
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => setReportDialogOpen(true)}
-              className="h-11 px-4 sm:px-5 rounded-full font-bold shadow-xl gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm"
-            >
-              <Plus className="h-5 w-5 stroke-[2.5]" />
-              <span>Report Flooding</span>
-            </Button>
+          {/* Floating Bottom Action Buttons (Hidden when mobile bottom sheet is active) */}
+          {!mobileSheetOpen && (
+            <>
+              {/* Desktop Spacious Dock (sm+) */}
+              <div className="hidden sm:flex absolute bottom-4 left-4 z-20 items-center gap-2.5 pointer-events-auto">
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={() => setReportDialogOpen(true)}
+                  className="h-11 px-5 rounded-full font-bold shadow-xl gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm"
+                >
+                  <Plus className="h-5 w-5 stroke-[2.5]" />
+                  <span>Report Flooding</span>
+                </Button>
 
-            {/* Plan Route FAB (especially useful on mobile) */}
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              onClick={() => {
-                setRoutePanelOpen(!routePanelOpen);
-                setMobileSheetOpen(true);
-              }}
-              className="h-11 px-3.5 sm:px-4 rounded-full font-bold shadow-xl gap-1.5 text-xs sm:text-sm border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 hover:bg-slate-50"
-            >
-              <Navigation className="h-4 w-4 text-indigo-600" />
-              <span className="hidden sm:inline">Safe Route</span>
-            </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  onClick={() => {
+                    setRoutePanelOpen(!routePanelOpen);
+                    setMobileSheetOpen(true);
+                  }}
+                  className="h-11 px-4 rounded-full font-bold shadow-xl gap-1.5 text-sm border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 hover:bg-slate-50"
+                >
+                  <Navigation className="h-4 w-4 text-indigo-600" />
+                  <span>Safe Route</span>
+                </Button>
 
-            {/* GPS Locate Button */}
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              onClick={handleLocateMe}
-              className="h-11 w-11 rounded-full shadow-xl bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 hover:bg-slate-50 text-slate-800 dark:text-slate-200"
-              title="Center on my location"
-            >
-              <LocateFixed className="h-5 w-5" />
-            </Button>
-          </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={handleLocateMe}
+                  className="h-11 w-11 rounded-full shadow-xl bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 hover:bg-slate-50 text-slate-800 dark:text-slate-200"
+                  title="Center on my location"
+                >
+                  <LocateFixed className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Mobile Compact Floating Dock (< sm) */}
+              <div className="sm:hidden absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between gap-1.5 pointer-events-auto">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setReportDialogOpen(true)}
+                  className="h-10 px-3.5 rounded-full font-bold shadow-lg gap-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs"
+                >
+                  <Plus className="h-4 w-4 stroke-[2.5]" />
+                  <span>Report</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setRoutePanelOpen(!routePanelOpen);
+                    setMobileSheetOpen(true);
+                  }}
+                  className="h-10 px-3.5 rounded-full font-bold shadow-lg gap-1.5 text-xs border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200"
+                >
+                  <Navigation className="h-4 w-4 text-indigo-600" />
+                  <span>Safe Route</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={handleLocateMe}
+                  className="h-10 w-10 rounded-full shadow-lg bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 shrink-0"
+                  title="Center on my location"
+                >
+                  <LocateFixed className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
 
           {/* Map Legend (Bottom Right) */}
           <MapLegend />

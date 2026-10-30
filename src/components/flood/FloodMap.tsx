@@ -276,41 +276,38 @@ export default function FloodMap(props: FloodMapProps) {
     const tileMap = new Map(props.tiles.map((t) => [t.id, t]));
 
     for (const road of SION_KURLA_OSM_ROADS) {
-      // At lower zoom levels, only render major arterials to prevent map clutter
-      if (!road.isMajor && currentZoom < 15) continue;
+      // Only at extreme bird-eye zoom (< 12) limit to major arterials
+      if (!road.isMajor && currentZoom < 12) continue;
 
       const evalResult = evaluateOsmRoadRisk(road, tileMap, props.incidents, props.reports);
       const { riskLevel, severityScore, reason } = evalResult;
 
-      // For Low risk roads at broad zoom (< 16), let the clean OSM basemap streets show naturally
-      if (riskLevel === "Low" && currentZoom < 16) continue;
-
-      let strokeColor = "#16a34a"; // Low
-      let weight = 2.5;
-      let opacity = 0.55;
+      let strokeColor = "#16a34a"; // Low Risk: Clean Passable Green
+      let weight = currentZoom < 15 ? 2.5 : 3.5;
+      let opacity = 0.8;
       let dashArray: string | undefined = undefined;
 
       if (riskLevel === "Closed") {
-        strokeColor = "#dc2626";
-        weight = 4.5;
+        strokeColor = "#b91c1c";
+        weight = currentZoom < 15 ? 4.8 : 5.8;
         opacity = 1.0;
         dashArray = "6, 6";
       } else if (riskLevel === "Critical") {
         strokeColor = "#dc2626";
-        weight = 4.0;
+        weight = currentZoom < 15 ? 4.2 : 5.2;
         opacity = 0.95;
       } else if (riskLevel === "High") {
         strokeColor = "#ea580c";
-        weight = 3.5;
-        opacity = 0.9;
+        weight = currentZoom < 15 ? 3.8 : 4.8;
+        opacity = 0.95;
       } else if (riskLevel === "Moderate") {
-        strokeColor = "#eab308";
-        weight = 3.0;
-        opacity = 0.85;
+        strokeColor = "#eab308"; // Moderate Risk: Vibrant Waterlogged Yellow
+        weight = currentZoom < 15 ? 3.2 : 4.2;
+        opacity = 0.9;
       } else if (riskLevel === "Unassessed") {
         strokeColor = "#94a3b8";
         weight = 1.5;
-        opacity = 0.25;
+        opacity = 0.4;
         dashArray = "4, 4";
       }
 
