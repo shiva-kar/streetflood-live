@@ -3,12 +3,13 @@ import { seedState } from "./data";
 import type { AppState } from "./types";
 
 const KEY = "streetflood:v1";
+const ALIAS_KEY = "streetflood_state_v1";
 let state: AppState | null = null;
 const listeners = new Set<() => void>();
 
 function load(): AppState {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(KEY) || window.localStorage.getItem(ALIAS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as AppState;
       if (parsed.version === 1) return parsed;
@@ -21,7 +22,9 @@ function load(): AppState {
 
 function persist() {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(state));
+    const serialized = JSON.stringify(state);
+    window.localStorage.setItem(KEY, serialized);
+    window.localStorage.setItem(ALIAS_KEY, serialized);
   } catch {
     // Storage quota (large photos) – keep in memory, warn once.
     console.warn("StreetFlood: could not persist state (storage full)");

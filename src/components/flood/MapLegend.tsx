@@ -84,6 +84,38 @@ export default function MapLegend() {
               </div>
             </div>
           </div>
+          {/* Real Street Network Lines */}
+          <div className="space-y-1.5 border-t border-slate-200 dark:border-slate-800 pt-2.5">
+            <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wider">
+              Street Network Risk (OSM):
+            </span>
+            <div className="space-y-1 pt-1 text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-2">
+                <span className="h-1 w-5 rounded-full bg-emerald-500 shrink-0" />
+                <span>Low Risk Street</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-1 w-5 rounded-full bg-amber-500 shrink-0" />
+                <span>Moderate Waterlogging</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-5 rounded-full bg-orange-500 shrink-0" />
+                <span>High Risk Inundation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-5 rounded-full bg-red-600 shrink-0" />
+                <span>Critical Risk Corridor</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-5 border-t-2 border-dashed border-red-600 shrink-0" />
+                <span>Closed to Traffic (Subway / Roadblock)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-5 rounded-full bg-blue-600 border border-white shrink-0" />
+                <span>Safe Road Navigation Route</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

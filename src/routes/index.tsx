@@ -570,9 +570,15 @@ function StreetFloodApp() {
           {/* Map Legend (Bottom Right) */}
           <MapLegend />
 
-          {/* MOBILE BOTTOM SHEET (Rendered only on screens < lg when active) */}
+          {/* MOBILE BOTTOM SHEET & BACKDROP (Screens < lg) */}
           {mobileSheetOpen && (
-            <div className="lg:hidden absolute inset-x-0 bottom-0 max-h-[75vh] z-30 flex flex-col rounded-t-2xl border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
+            <>
+              <div 
+                className="lg:hidden absolute inset-0 bg-black/25 z-25 backdrop-blur-[1px] animate-in fade-in duration-150" 
+                onClick={() => setMobileSheetOpen(false)} 
+                title="Tap to dismiss"
+              />
+              <div className="lg:hidden absolute inset-x-0 bottom-0 max-h-[75vh] z-30 flex flex-col rounded-t-2xl border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
               <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 shrink-0" />
               <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                 {mode === "authority" ? (
@@ -662,10 +668,12 @@ function StreetFloodApp() {
                     onOpenReport={() => setReportDialogOpen(true)}
                     onOpenRoute={() => setRoutePanelOpen(true)}
                     onOpenPreparedness={() => setPrepModalOpen(true)}
+                    onClose={() => setMobileSheetOpen(false)}
                   />
                 )}
               </div>
             </div>
+            </>
           )}
         </main>
       </div>
