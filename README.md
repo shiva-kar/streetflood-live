@@ -1,156 +1,210 @@
-# StreetFlood Live
+# StreetFlood Live 🌊
 
-Use the complete StreetFlood Live Build Plan provided in the attached Markdown document as the authoritative technical and functional specification.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-shivakar.me-0284c7?style=flat&logo=google-chrome&logoColor=white)](https://shivakar.me/streetflood-live/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-success?logo=github)](https://shiva-kar.github.io/streetflood-live/)
+[![Deploy Status](https://github.com/shiva-kar/streetflood-live/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/shiva-kar/streetflood-live/actions/workflows/deploy.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev/)
+[![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/)
+[![OpenStreetMap](https://img.shields.io/badge/OSM-936%20Road%20Segments-7ebc6f?logo=openstreetmap&logoColor=white)](https://www.openstreetmap.org/)
 
-I want you to IMPLEMENT THE COMPLETE APPLICATION, not generate another plan, explanation, wireframe or partial prototype.
+**StreetFlood Live** is a hyperlocal street flood monitoring, predictive early warning, and road-based evacuation navigation platform designed for high-risk monsoon flood corridors.
 
-### 1. Implementation requirements
+Focusing on the critical **Sion–Kurla Corridor in Mumbai** (LBS Marg, Mithi River basin, Chunabhatti lowlands, and Eastern Express Highway approaches), StreetFlood Live bridges the gap between macro-level meteorological alerts and micro-level street reality.
 
-Build the complete StreetFlood Live application in the existing project in one comprehensive implementation.
+🌐 **Production URL**: [https://shivakar.me/streetflood-live/](https://shivakar.me/streetflood-live/)  
+🌐 **GitHub Pages Mirror**: [https://shiva-kar.github.io/streetflood-live/](https://shiva-kar.github.io/streetflood-live/)
 
-Before modifying anything:
+---
 
-- Inspect the existing project structure and dependencies.
-- Preserve existing working functionality.
-- Reuse the current framework and compatible dependencies.
-- Avoid unnecessary rewrites or additional dependencies.
+## 🌟 Highlights & Features
 
-Implement all seven features described in the build plan:
+### 1. 🗺️ Hyperlocal 100m² Micro-Grid Severity Engine
 
-1. Live Flood Map with Severity Scores.
-2. Crowdsourced Photo and Report Submission.
-3. Safe Route Navigation.
-4. Targeted Alert Notifications.
-5. Municipal Control Room Dashboard.
-6. Predictive Flood Risk and Early Warning System.
-7. Emergency Preparedness and Evacuation Assistance.
+- Divides urban corridors into **100m × 100m micro-blocks** with individual real-time flood severity scores (0 to 100).
+- Transparent weighted calculation combining:
+  - **Crowdsourced citizen reports** (with water depth multipliers: Ankle ×1.0, Knee ×1.5, Waist/Chest ×2.0).
+  - **Verified municipal inspector reports**.
+  - **IoT curb-level depth sensors** (simulated telemetry).
+  - **Live rainfall telemetry & drainage capacity indices**.
+- Four standard severity tiers:
+  - 🟢 **Low Risk (0–19)**: Passable, normal conditions.
+  - 🟡 **Moderate Risk (20–39)**: Street waterlogging, drive with caution.
+  - 🟠 **High Risk (40–69)**: Dangerous inundation, small vehicles barred.
+  - 🔴 **Critical Risk (70–100)**: Impassable / submerged, evacuation advised.
 
-Do not silently omit features.
+### 2. 🛣️ Real Road-Network Evacuation Routing (OSRM)
 
-### 2. Functional requirements
+- Unlike basic apps that draw straight lines across buildings and railway tracks, StreetFlood Live performs **true turn-by-turn routing along actual street network geometry** using OpenStreetMap and Project OSRM.
+- Evaluates the flood risk of every road along candidate paths and automatically diverts users away from inundated corridors and official roadblocks toward the safest accessible relief shelter.
 
-Every feature must have working interactions, not merely a visual representation.
+### 3. 🚦 936 OpenStreetMap Road Segments with Live Safety Overlays
 
-Specifically:
+- Real-time coloring for **128.45 km of street network** across the Sion–Kurla basin:
+  - 🟢 **Emerald Green**: Safe & passable streets.
+  - 🟡 **Vibrant Amber**: Moderate waterlogging.
+  - 🟠 **Vivid Orange**: High hazard street.
+  - 🔴 **Crimson Red**: Critical / impassable flood inundation.
+  - 🛑 **Crimson Dashed**: Official municipal roadblock closures (⛔).
 
-- Submitting a flood report must update the associated map tile's severity.
-- Uploading a photograph must show a preview.
-- Verifying or dismissing reports must update their status.
-- Road closures must visibly affect the resident map.
-- Publishing an authority alert must make it visible to residents in the selected area.
-- Predictive risk must respond to rainfall, hotspot and drainage inputs.
-- Predicted risk must generate corresponding advance-warning suggestions.
-- Safe routing must calculate a route that accounts for flooded tiles.
-- High and Critical risk locations must expose the preparedness and evacuation panel.
-- Shelters, emergency contacts and checklists must be accessible from the preparedness panel.
+### 4. 🔮 3-Hour Predictive Early Warning System
 
-Use localStorage or another lightweight local persistence mechanism so that refreshing the application does not unnecessarily erase demo interactions.
+- Anticipates emerging flash flood risks up to 3 hours in advance based on forecasted cloudburst intensity, localized drainage discharge limits, and topography.
+- Generates proactive resident advisories before water accumulation becomes hazardous.
 
-### 3. Predictive system
+### 5. 🏢 Municipal Control Room Console
 
-Implement the rule-based predictive system described in the specification.
+- Role-based switcher between **Resident View** and **Municipal Control Room**:
+  - **Report Triage Queue**: Municipal operators can verify, inspect photos, or dismiss crowdsourced flood reports.
+  - **Road Closure Manager**: Publish official roadblocks (⛔ Closed to All Traffic, 🚸 Closed to Small Vehicles) with live advisory notices instantly pushed to the map.
+  - **Targeted Broadcast Advisories**: Dispatch localized ward-level warnings with audio/visual priority markers.
 
-Do not introduce an unnecessary machine-learning model.
+### 6. 🛟 Emergency Evacuation, Shelters & Offline Checklists
 
-The system must:
+- Directory of designated municipal relief shelters (schools, community centres, civic halls) with capacity status, address details, and road navigation links.
+- Direct speed-dial to emergency helplines (`Dial 112`, Disaster Management Cell).
+- Emergency monsoon survival and family evacuation checklists.
 
-- Calculate current flood severity.
-- Calculate predicted risk for the next three hours.
-- Explain why a particular location is considered at risk.
-- Display predicted risk separately from current flood severity.
-- Generate advance-warning suggestions for Moderate predicted-risk locations.
+### 7. 📱 Mobile Zero-Overlap Responsive Layout
 
-### 4. Map and routing
+- Optimized for mobile viewports (e.g. iPhone, Android) with:
+  - Symmetrical icon-only map controls (`Map Layers` top-right, `Legend` bottom-right).
+  - Floating 3-button circular dock (`[+]` Report, `[🧭]` Safe Route, `[📍]` GPS Locate) maintaining >200px of open map space.
+  - Compact sliding drawer menu via hamburger button (`[☰]`).
+  - Gesture-first touch controls (native pinch-to-zoom).
 
-The map must be the central component of the application.
+---
 
-Implement:
+## 📐 Flood Severity Formula
 
-- Interactive map with zoom and pan.
-- Flood severity grid overlays.
-- Individual tile selection and details.
-- Flood report markers.
-- Road closure indicators.
-- Predicted-risk overlays.
-- Shelter markers.
-- Route visualization.
+Each 100m² tile computes its flood score using an open, auditable weighted formula:
 
-Use Leaflet and OpenStreetMap where compatible with the existing project.
+$$\text{Severity} = \min\left(100, \; \sum R_{\text{unverified}} \times M_d + \sum R_{\text{verified}} \times M_d + W_{\text{closure}} + S_{\text{sensor}} + I_{\text{rain}}\right)$$
 
-Implement simplified A* or Dijkstra routing using the flood-risk information from the build plan. Clearly identify approximate routes as demonstration routes rather than verified safe navigation.
+Where:
 
-### 5. Interface and design
+- $R_{\text{unverified}}$: Unverified citizen report (+10 base)
+- $R_{\text{verified}}$: Municipal verified report (+20 base)
+- $M_d$: Water Depth Multiplier
+  - Ankle-deep (0–15 cm): $\times 1.0$
+  - Knee-deep (15–45 cm): $\times 1.5$
+  - Waist-deep (45–90 cm): $\times 2.0$
+  - Impassable / Submerged (>90 cm): $\times 2.5$
+- $W_{\text{closure}}$: Active road incident (+15 for ClosedAllTraffic, +8 for ClosedSmallVehicles)
+- $S_{\text{sensor}}$: Telemetry curb sensor score (up to +25)
+- $I_{\text{rain}}$: Real-time rainfall intensity index (up to +15)
 
-Create a professional, modern, polished interface suitable for a national-level hackathon demonstration.
+---
 
-Requirements:
+## 🛠️ Tech Stack & Architecture
 
-- Mobile-first responsive design.
-- Map-centric resident experience.
-- Clear risk indicators and legends.
-- Well-designed dashboard cards and information panels.
-- Consistent typography, spacing and colors.
-- Accessible contrast and readable labels.
-- Proper loading, empty and error states.
-- Smooth navigation between Resident View and Authority View.
+- **Frontend Core**: [React 19](https://react.dev/), [TypeScript 5.9](https://www.typescriptlang.org/)
+- **Routing & State**: [TanStack Router](https://tanstack.com/router), [TanStack Query](https://tanstack.com/query)
+- **Styling & UI**: [Tailwind CSS v4](https://tailwindcss.com/), [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/), [Sonner Toasts](https://sonner.emilkowal.ski/)
+- **Mapping & Geospatial**: [Leaflet 1.9](https://leafletjs.com/), [OpenStreetMap](https://www.openstreetmap.org/), [Project OSRM Routing Engine API](https://project-osrm.org/)
+- **Build & Server**: [Vite 8](https://vitejs.dev/), [Cloudflare Nitro Preset](https://nitro.unjs.io/)
+- **Testing**: [Vitest 4](https://vitest.dev/) (24/24 unit tests passing)
+- **CI/CD & Hosting**: GitHub Actions + GitHub Pages with Custom Domain ([shivakar.me](https://shivakar.me/streetflood-live/))
 
-Do not sacrifice functionality for animations or decorative UI.
+---
 
-### 6. Data and reliability
+## 🚀 Getting Started
 
-Use realistic Indian urban scenarios and seeded demonstration data.
+### Prerequisites
 
-Where real sensors, rainfall forecasts or official integrations are unavailable:
+- [Node.js](https://nodejs.org/) (v18.x or v20.x recommended)
+- `npm` or `bun`
 
-- Use clearly labelled simulated data.
-- Never present simulated readings as verified real-world measurements.
-- Distinguish verified authority reports from unverified community reports.
-- Display timestamps and data freshness.
-- Clearly disclose that the prototype is not intended for real emergency decisions.
+### Installation
 
-Do not invent official municipal partnerships, shelter availability or emergency contacts.
+1. **Clone the repository**:
 
-### 7. Completion and verification
+   ```bash
+   git clone https://github.com/shiva-kar/streetflood-live.git
+   cd streetflood-live
+   ```
 
-After implementation:
+2. **Install dependencies**:
 
-- Check all major user workflows.
-- Check all buttons, forms, navigation and interactive controls.
-- Verify resident and authority views.
-- Verify persistence after refreshing.
-- Verify that changing a report or incident updates the appropriate map information.
-- Fix compilation errors, broken imports and runtime errors.
-- Ensure the application can start successfully using the existing project configuration.
+   ```bash
+   npm install
+   ```
 
-Do not leave placeholder buttons, fake functionality, TODO sections, unfinished screens or pseudocode.
+3. **Start local development server**:
 
-If an external integration cannot be implemented without credentials or physical hardware, provide a functional simulated alternative and clearly label it.
+   ```bash
+   npm run dev
+   ```
 
-### FINAL INSTRUCTION
+   Open [http://localhost:8080](http://localhost:8080) in your browser.
 
-Implement the complete, integrated StreetFlood Live application in this execution.
+4. **Run test suite**:
 
-Prioritize a functional end-to-end product over additional features or architectural complexity.
+   ```bash
+   npm run test
+   ```
 
-Do not stop after creating the interface or basic application scaffold. Complete the implementation, verify the workflows and leave the project in a runnable state.
+5. **Build for production**:
+   ```bash
+   npm run build
+   ```
 
-This project was built with [Lovable](https://lovable.dev).
+---
 
-## Build with Lovable
+## 📂 Project Structure
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/72dcc901-6639-41be-b6e2-27dfc6951f04).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
 ```
+streetflood-live/
+├── .github/workflows/          # GitHub Actions deployment pipelines
+├── public/                     # Static assets, icons, manifest
+├── qa-evidence/                # Visual verification screenshots (Mobile & Desktop)
+├── src/
+│   ├── components/
+│   │   ├── flood/              # Domain-specific flood components
+│   │   │   ├── FloodMap.tsx          # Leaflet map with 936 OSM road overlays & 100m² grid
+│   │   │   ├── Header.tsx            # Responsive header with mobile hamburger drawer
+│   │   │   ├── MapLayerControls.tsx  # Layer visibility controls (Grid, Roads, Shelters, Closures)
+│   │   │   ├── MapLegend.tsx         # Responsive flood risk legend & color scale
+│   │   │   ├── RoutePanel.tsx        # Road-based evacuation route planner (OSRM)
+│   │   │   ├── AuthorityDashboard.tsx# Municipal control room triage & road closures
+│   │   │   ├── TileDetailsSheet.tsx  # In-depth tile flood score breakdown & sensor info
+│   │   │   └── ...
+│   │   └── ui/                 # Accessible Radix UI components
+│   ├── lib/
+│   │   └── flood/              # Core business logic & algorithms
+│   │       ├── data.ts               # Geographic bounds, corridor zones & relief shelters
+│   │       ├── engine.ts             # Micro-grid tile computation & flood scoring formula
+│   │       ├── osmNetwork.ts         # OSM highway geometry parser & risk evaluator
+│   │       ├── roadRouting.ts        # Turn-by-turn OSRM road evacuation routing
+│   │       ├── store.ts              # Reactive state store with LocalStorage persistence
+│   │       └── types.ts              # Domain TypeScript types
+│   ├── routes/
+│   │   ├── __root.tsx          # Root TanStack router layout
+│   │   └── index.tsx           # Main application view (Resident / Control Room)
+│   └── test/                   # Vitest unit test suites
+├── LICENSE                     # MIT License
+├── package.json
+└── README.md
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+<!-- LOVABLE:BEGIN -->
+
+## Lovable Integration
+
+This project was bootstrapped and synced with [Lovable](https://lovable.dev).
+
+To develop with Lovable:
+
+- Continue in the [Lovable Editor](https://lovable.dev/projects/72dcc901-6639-41be-b6e2-27dfc6951f04).
+- Pushes to the `main` branch sync directly back to Lovable.
+
+<!-- LOVABLE:END -->
