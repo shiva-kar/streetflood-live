@@ -9,6 +9,7 @@ I want you to IMPLEMENT THE COMPLETE APPLICATION, not generate another plan, exp
 Build the complete StreetFlood Live application in the existing project in one comprehensive implementation.
 
 Before modifying anything:
+
 - Inspect the existing project structure and dependencies.
 - Preserve existing working functionality.
 - Reuse the current framework and compatible dependencies.
@@ -31,6 +32,7 @@ Do not silently omit features.
 Every feature must have working interactions, not merely a visual representation.
 
 Specifically:
+
 - Submitting a flood report must update the associated map tile's severity.
 - Uploading a photograph must show a preview.
 - Verifying or dismissing reports must update their status.
@@ -51,6 +53,7 @@ Implement the rule-based predictive system described in the specification.
 Do not introduce an unnecessary machine-learning model.
 
 The system must:
+
 - Calculate current flood severity.
 - Calculate predicted risk for the next three hours.
 - Explain why a particular location is considered at risk.
@@ -62,6 +65,7 @@ The system must:
 The map must be the central component of the application.
 
 Implement:
+
 - Interactive map with zoom and pan.
 - Flood severity grid overlays.
 - Individual tile selection and details.
@@ -80,6 +84,7 @@ Implement simplified A* or Dijkstra routing using the flood-risk information fro
 Create a professional, modern, polished interface suitable for a national-level hackathon demonstration.
 
 Requirements:
+
 - Mobile-first responsive design.
 - Map-centric resident experience.
 - Clear risk indicators and legends.
@@ -96,6 +101,7 @@ Do not sacrifice functionality for animations or decorative UI.
 Use realistic Indian urban scenarios and seeded demonstration data.
 
 Where real sensors, rainfall forecasts or official integrations are unavailable:
+
 - Use clearly labelled simulated data.
 - Never present simulated readings as verified real-world measurements.
 - Distinguish verified authority reports from unverified community reports.

@@ -23,7 +23,9 @@ export const ZONES = [
 ] as const;
 
 export function zoneFor(row: number, col: number) {
-  return ZONES.find((z) => row >= z.rows[0] && row <= z.rows[1] && col >= z.cols[0] && col <= z.cols[1])!;
+  return ZONES.find(
+    (z) => row >= z.rows[0] && row <= z.rows[1] && col >= z.cols[0] && col <= z.cols[1],
+  )!;
 }
 
 /** Deterministic hash → [0,1). Avoids Math.random so seeds are stable. */
@@ -49,7 +51,9 @@ export function buildTiles(): TileBase[] {
   const out: TileBase[] = [];
   for (let r = 0; r < GRID.rows; r++) {
     for (let c = 0; c < GRID.cols; c++) {
-      const hb = HOTSPOT_BOXES.find((b) => r >= b.rows[0] && r <= b.rows[1] && c >= b.cols[0] && c <= b.cols[1]);
+      const hb = HOTSPOT_BOXES.find(
+        (b) => r >= b.rows[0] && r <= b.rows[1] && c >= b.cols[0] && c <= b.cols[1],
+      );
       const z = zoneFor(r, c);
       const noise = hash01(r, c, 7);
       out.push({
@@ -70,11 +74,51 @@ export function buildTiles(): TileBase[] {
 }
 
 export const SHELTERS: Shelter[] = [
-  { id: "sh1", name: "Demo Shelter A – Municipal School", address: "Near Sion Hospital Rd, Sion (simulated)", lat: 19.0455, lng: 72.8655, kind: "School", capacityStatus: "Space available" },
-  { id: "sh2", name: "Demo Shelter B – Community Hall", address: "Chunabhatti East (simulated)", lat: 19.0478, lng: 72.879, kind: "Community Hall", capacityStatus: "Filling up" },
-  { id: "sh3", name: "Demo Shelter C – Ward Office Annexe", address: "Kurla West, off LBS Marg (simulated)", lat: 19.0585, lng: 72.8745, kind: "Municipal Building", capacityStatus: "Space available" },
-  { id: "sh4", name: "Demo Shelter D – Secondary School", address: "Kurla, Mithi river side (simulated)", lat: 19.0565, lng: 72.8655, kind: "School", capacityStatus: "Near capacity" },
-  { id: "sh5", name: "Demo Shelter E – Community Centre", address: "Sion–Kurla link road (simulated)", lat: 19.0515, lng: 72.8712, kind: "Community Hall", capacityStatus: "Space available" },
+  {
+    id: "sh1",
+    name: "Demo Shelter A – Municipal School",
+    address: "Near Sion Hospital Rd, Sion (simulated)",
+    lat: 19.0455,
+    lng: 72.8655,
+    kind: "School",
+    capacityStatus: "Space available",
+  },
+  {
+    id: "sh2",
+    name: "Demo Shelter B – Community Hall",
+    address: "Chunabhatti East (simulated)",
+    lat: 19.0478,
+    lng: 72.879,
+    kind: "Community Hall",
+    capacityStatus: "Filling up",
+  },
+  {
+    id: "sh3",
+    name: "Demo Shelter C – Ward Office Annexe",
+    address: "Kurla West, off LBS Marg (simulated)",
+    lat: 19.0585,
+    lng: 72.8745,
+    kind: "Municipal Building",
+    capacityStatus: "Space available",
+  },
+  {
+    id: "sh4",
+    name: "Demo Shelter D – Secondary School",
+    address: "Kurla, Mithi river side (simulated)",
+    lat: 19.0565,
+    lng: 72.8655,
+    kind: "School",
+    capacityStatus: "Near capacity",
+  },
+  {
+    id: "sh5",
+    name: "Demo Shelter E – Community Centre",
+    address: "Sion–Kurla link road (simulated)",
+    lat: 19.0515,
+    lng: 72.8712,
+    kind: "Community Hall",
+    capacityStatus: "Space available",
+  },
 ];
 
 export const EMERGENCY_CONTACTS = [
@@ -83,7 +127,11 @@ export const EMERGENCY_CONTACTS = [
   { label: "Fire & Rescue", number: "101", note: "" },
   { label: "Ambulance", number: "108", note: "Emergency medical" },
   { label: "Ambulance (maternal/child)", number: "102", note: "" },
-  { label: "City disaster control room", number: "1916", note: "Demo listing – confirm with your municipality" },
+  {
+    label: "City disaster control room",
+    number: "1916",
+    note: "Demo listing – confirm with your municipality",
+  },
 ];
 
 export const CHECKLISTS = [
@@ -121,31 +169,172 @@ const ago = (now: number, min: number) => new Date(now - min * 60000).toISOStrin
 
 export function seedState(now: number): AppState {
   const reports: FloodReport[] = [
-    { id: "r1", tileId: tileId(2, 4), lat: 19.0422, lng: 72.8642, description: "Water collecting near the bus stop, autos avoiding the left lane.", severityUser: "Knees", createdAt: ago(now, 18), status: "Verified", reviewedAt: ago(now, 10), photoUrl: "/images/demo-flood-1.jpg" },
-    { id: "r2", tileId: tileId(2, 4), lat: 19.0424, lng: 72.8645, description: "Two-wheelers stalling here.", severityUser: "Knees", createdAt: ago(now, 25), status: "Unverified" },
-    { id: "r3", tileId: tileId(3, 5), lat: 19.0432, lng: 72.8653, description: "Footpath submerged outside shops.", severityUser: "Ankles", createdAt: ago(now, 40), status: "Unverified" },
-    { id: "r4", tileId: tileId(20, 16), lat: 19.0584, lng: 72.8756, description: "Subway approach flooded, water rising quickly.", severityUser: "WaistPlus", createdAt: ago(now, 12), status: "Verified", reviewedAt: ago(now, 6), photoUrl: "/images/demo-flood-2.jpg" },
-    { id: "r5", tileId: tileId(20, 16), lat: 19.0585, lng: 72.8757, description: "Cars stuck under the bridge.", severityUser: "WaistPlus", createdAt: ago(now, 15), status: "Unverified" },
-    { id: "r6", tileId: tileId(19, 17), lat: 19.0576, lng: 72.8766, description: "Knee-deep water near station road.", severityUser: "Knees", createdAt: ago(now, 30), status: "Unverified" },
-    { id: "r7", tileId: tileId(6, 17), lat: 19.0458, lng: 72.8766, description: "Nullah overflowing onto lane.", severityUser: "Knees", createdAt: ago(now, 22), status: "Unverified" },
-    { id: "r8", tileId: tileId(15, 1), lat: 19.0538, lng: 72.8614, description: "Water entering ground-floor homes near the river wall.", severityUser: "Knees", createdAt: ago(now, 35), status: "Verified", reviewedAt: ago(now, 20) },
-    { id: "r9", tileId: tileId(10, 12), lat: 19.0495, lng: 72.8719, description: "Some puddles, traffic moving.", severityUser: "Footpath", createdAt: ago(now, 50), status: "Unverified" },
-    { id: "r10", tileId: tileId(12, 8), lat: 19.0512, lng: 72.8681, description: "Garbage blocking drain, minor pooling.", severityUser: "Ankles", createdAt: ago(now, 45), status: "Unverified" },
+    {
+      id: "r1",
+      tileId: tileId(2, 4),
+      lat: 19.0422,
+      lng: 72.8642,
+      description: "Water collecting near the bus stop, autos avoiding the left lane.",
+      severityUser: "Knees",
+      createdAt: ago(now, 18),
+      status: "Verified",
+      reviewedAt: ago(now, 10),
+      photoUrl: "/images/demo-flood-1.jpg",
+    },
+    {
+      id: "r2",
+      tileId: tileId(2, 4),
+      lat: 19.0424,
+      lng: 72.8645,
+      description: "Two-wheelers stalling here.",
+      severityUser: "Knees",
+      createdAt: ago(now, 25),
+      status: "Unverified",
+    },
+    {
+      id: "r3",
+      tileId: tileId(3, 5),
+      lat: 19.0432,
+      lng: 72.8653,
+      description: "Footpath submerged outside shops.",
+      severityUser: "Ankles",
+      createdAt: ago(now, 40),
+      status: "Unverified",
+    },
+    {
+      id: "r4",
+      tileId: tileId(20, 16),
+      lat: 19.0584,
+      lng: 72.8756,
+      description: "Subway approach flooded, water rising quickly.",
+      severityUser: "WaistPlus",
+      createdAt: ago(now, 12),
+      status: "Verified",
+      reviewedAt: ago(now, 6),
+      photoUrl: "/images/demo-flood-2.jpg",
+    },
+    {
+      id: "r5",
+      tileId: tileId(20, 16),
+      lat: 19.0585,
+      lng: 72.8757,
+      description: "Cars stuck under the bridge.",
+      severityUser: "WaistPlus",
+      createdAt: ago(now, 15),
+      status: "Unverified",
+    },
+    {
+      id: "r6",
+      tileId: tileId(19, 17),
+      lat: 19.0576,
+      lng: 72.8766,
+      description: "Knee-deep water near station road.",
+      severityUser: "Knees",
+      createdAt: ago(now, 30),
+      status: "Unverified",
+    },
+    {
+      id: "r7",
+      tileId: tileId(6, 17),
+      lat: 19.0458,
+      lng: 72.8766,
+      description: "Nullah overflowing onto lane.",
+      severityUser: "Knees",
+      createdAt: ago(now, 22),
+      status: "Unverified",
+    },
+    {
+      id: "r8",
+      tileId: tileId(15, 1),
+      lat: 19.0538,
+      lng: 72.8614,
+      description: "Water entering ground-floor homes near the river wall.",
+      severityUser: "Knees",
+      createdAt: ago(now, 35),
+      status: "Verified",
+      reviewedAt: ago(now, 20),
+    },
+    {
+      id: "r9",
+      tileId: tileId(10, 12),
+      lat: 19.0495,
+      lng: 72.8719,
+      description: "Some puddles, traffic moving.",
+      severityUser: "Footpath",
+      createdAt: ago(now, 50),
+      status: "Unverified",
+    },
+    {
+      id: "r10",
+      tileId: tileId(12, 8),
+      lat: 19.0512,
+      lng: 72.8681,
+      description: "Garbage blocking drain, minor pooling.",
+      severityUser: "Ankles",
+      createdAt: ago(now, 45),
+      status: "Unverified",
+    },
   ];
   const incidents: RoadIncident[] = [
-    { id: "i1", tileId: tileId(20, 16), status: "ClosedAllTraffic", description: "Subway closed due to waterlogging (demo incident).", createdAt: ago(now, 8), updatedAt: ago(now, 8), createdBy: "Authority" },
-    { id: "i2", tileId: tileId(2, 4), status: "ClosedSmallVehicles", description: "Closed to two-wheelers and autos near the circle (demo).", createdAt: ago(now, 9), updatedAt: ago(now, 9), createdBy: "Authority" },
+    {
+      id: "i1",
+      tileId: tileId(20, 16),
+      status: "ClosedAllTraffic",
+      description: "Subway closed due to waterlogging (demo incident).",
+      createdAt: ago(now, 8),
+      updatedAt: ago(now, 8),
+      createdBy: "Authority",
+    },
+    {
+      id: "i2",
+      tileId: tileId(2, 4),
+      status: "ClosedSmallVehicles",
+      description: "Closed to two-wheelers and autos near the circle (demo).",
+      createdAt: ago(now, 9),
+      updatedAt: ago(now, 9),
+      createdBy: "Authority",
+    },
   ];
   const alerts: FloodAlert[] = [
-    { id: "a1", title: "Subway closed – Kurla West", message: "The subway near Kurla station is closed to all traffic due to waterlogging. Use the alternate link road. (Demo alert)", severity: "Critical", type: "Municipal", status: "Published", tileIds: [tileId(20, 16), tileId(19, 16), tileId(20, 17)], wardLabel: "Kurla West", createdAt: ago(now, 8), publishedAt: ago(now, 8) },
-    { id: "a2", title: "Waterlogging near Sion Circle", message: "Knee-deep water reported. Two-wheelers advised to avoid the stretch. (Demo alert)", severity: "Warning", type: "Municipal", status: "Published", tileIds: [tileId(2, 4), tileId(3, 4), tileId(3, 5)], wardLabel: "Sion", createdAt: ago(now, 9), publishedAt: ago(now, 9) },
+    {
+      id: "a1",
+      title: "Subway closed – Kurla West",
+      message:
+        "The subway near Kurla station is closed to all traffic due to waterlogging. Use the alternate link road. (Demo alert)",
+      severity: "Critical",
+      type: "Municipal",
+      status: "Published",
+      tileIds: [tileId(20, 16), tileId(19, 16), tileId(20, 17)],
+      wardLabel: "Kurla West",
+      createdAt: ago(now, 8),
+      publishedAt: ago(now, 8),
+    },
+    {
+      id: "a2",
+      title: "Waterlogging near Sion Circle",
+      message: "Knee-deep water reported. Two-wheelers advised to avoid the stretch. (Demo alert)",
+      severity: "Warning",
+      type: "Municipal",
+      status: "Published",
+      tileIds: [tileId(2, 4), tileId(3, 4), tileId(3, 5)],
+      wardLabel: "Sion",
+      createdAt: ago(now, 9),
+      publishedAt: ago(now, 9),
+    },
   ];
   return {
     version: 1,
     reports,
     incidents,
     alerts,
-    sim: { recentRainfall: 28, forecastRainfall: 42, drainageOffset: 0, useHotspots: true, tick: 0, lastSensorRefresh: ago(now, 4) },
+    sim: {
+      recentRainfall: 28,
+      forecastRainfall: 42,
+      drainageOffset: 0,
+      useHotspots: true,
+      tick: 0,
+      lastSensorRefresh: ago(now, 4),
+    },
     archivedPredictiveWards: [],
     checklist: {},
     homeWard: "sion",

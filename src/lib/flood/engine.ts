@@ -106,7 +106,8 @@ export function computeTiles(state: AppState, now: number): Tile[] {
   const closures = new Map<string, { s: IncidentStatus; t: number }>();
   for (const i of state.incidents) {
     const prev = closures.get(i.tileId);
-    if (!prev || INCIDENT_SCORE[i.status] > INCIDENT_SCORE[prev.s]) closures.set(i.tileId, { s: i.status, t: Date.parse(i.updatedAt) });
+    if (!prev || INCIDENT_SCORE[i.status] > INCIDENT_SCORE[prev.s])
+      closures.set(i.tileId, { s: i.status, t: Date.parse(i.updatedAt) });
   }
   const sensorTime = Date.parse(sim.lastSensorRefresh);
 
@@ -269,7 +270,12 @@ export function planRoute(tiles: Tile[], fromId: string, toId: string): RouteRes
   }
   let dist = 0;
   for (let i = 1; i < path.length; i++)
-    dist += distanceKm(path[i - 1].centerLat, path[i - 1].centerLng, path[i].centerLat, path[i].centerLng);
+    dist += distanceKm(
+      path[i - 1].centerLat,
+      path[i - 1].centerLng,
+      path[i].centerLat,
+      path[i].centerLng,
+    );
   const counts: Record<RiskLevel, number> = { Low: 0, Moderate: 0, High: 0, Critical: 0 };
   path.forEach((t) => counts[t.currentRiskLevel]++);
   // compare with straight line
@@ -282,10 +288,16 @@ export function planRoute(tiles: Tile[], fromId: string, toId: string): RouteRes
     const t = byId.get(tileId(r, c));
     if (t && !seen.has(t.id)) {
       seen.add(t.id);
-      if (t.currentRiskLevel === "High" || t.currentRiskLevel === "Critical" || t.closure === "ClosedAllTraffic") straightLineRisky++;
+      if (
+        t.currentRiskLevel === "High" ||
+        t.currentRiskLevel === "Critical" ||
+        t.closure === "ClosedAllTraffic"
+      )
+        straightLineRisky++;
     }
   }
-  const slowFactor = 1 + (counts.Moderate * 0.3 + counts.High * 1 + counts.Critical * 2) / Math.max(1, path.length);
+  const slowFactor =
+    1 + (counts.Moderate * 0.3 + counts.High * 1 + counts.Critical * 2) / Math.max(1, path.length);
   return {
     path,
     distanceKm: dist,
