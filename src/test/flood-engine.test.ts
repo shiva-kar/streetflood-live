@@ -11,7 +11,8 @@ import {
   tileAt,
 } from "@/lib/flood/engine";
 import { buildTiles, seedState, SHELTERS, EMERGENCY_CONTACTS, CHECKLISTS } from "@/lib/flood/data";
-import type { AppState } from "@/lib/flood/types";
+import { getEnrichedBreakdown } from "@/components/flood/breakdownHelper";
+import type { AppState, FloodReport } from "@/lib/flood/types";
 
 describe("Rule-based Flood Severity Engine", () => {
   it("correctly maps numerical scores to discrete risk levels", () => {
@@ -172,5 +173,148 @@ describe("Emergency Shelters & Preparedness Data", () => {
     expect(CHECKLISTS.some((c) => c.key === "household")).toBe(true);
     expect(CHECKLISTS.some((c) => c.key === "vehicles")).toBe(true);
     expect(CHECKLISTS.some((c) => c.key === "vulnerable")).toBe(true);
+  });
+});
+
+describe("Score Calculation Breakdown Display (TileDetailsSheet)", () => {
+  it("displays WaistPlus unverified and verified reports with x2.0 multiplier and accurate contributions", () => {
+    const now = Date.now();
+    const state = seedState(now);
+    const tiles = computeTiles(state, now);
+    const tKurla = tiles.find((t) => t.id === "t_20_16")!;
+
+    const breakdown = getEnrichedBreakdown(tKurla, state.reports, now);
+
+    const unverifiedItem = breakdown.find((b) => b.label.includes("unverified"));
+    expect(unverifiedItem).toBeDefined();
+    expect(unverifiedItem!.label).toBe("1 unverified report (Waist-deep ×2.0)");
+    expect(unverifiedItem!.points).toBe("+20");
+
+    const verifiedItem = breakdown.find(
+      (b) => b.label.includes("verified") && !b.label.includes("unverified"),
+    );
+    expect(verifiedItem).toBeDefined();
+    expect(verifiedItem!.label).toBe("1 verified report (Waist-deep ×2.0)");
+    expect(verifiedItem!.points).toBe("+40");
+  });
+
+  it("displays other water-depth levels with their correct multipliers", () => {
+    const now = Date.now();
+    const testTileId = "t_10_10";
+
+    const customReports: FloodReport[] = [
+      {
+        id: "cr1",
+        tileId: testTileId,
+        lat: 19.04,
+        lng: 72.87,
+        description: "Footpath test",
+        severityUser: "Footpath",
+        createdAt: new Date(now - 10000).toISOString(),
+        status: "Unverified",
+      },
+      {
+        id: "cr2",
+        tileId: testTileId,
+        lat: 19.04,
+        lng: 72.87,
+        description: "Ankles test",
+        severityUser: "Ankles",
+        createdAt: new Date(now - 10000).toISOString(),
+        status: "Verified",
+      },
+      {
+        id: "cr3",
+        tileId: testTileId,
+        lat: 19.04,
+        lng: 72.87,
+        description: "Knees test",
+        severityUser: "Knees",
+        createdAt: new Date(now - 10000).toISOString(),
+        status: "Unverified",
+      },
+    ];
+
+    const state: AppState = {
+      ...seedState(now),
+      reports: customReports,
+      incidents: [],
+    };
+
+    const tiles = computeTiles(state, now);
+    const tile = tiles.find((t) => t.id === testTileId)!;
+    const breakdown = getEnrichedBreakdown(tile, customReports, now);
+
+    // Footpath unverified: 10 * 0.5 = 5
+    const footpathItem = breakdown.find((b) => b.label.includes("Footpath"));
+    expect(footpathItem).toBeDefined();
+    expect(footpathItem!.label).toBe("1 unverified report (Footpath ×0.5)");
+    expect(footpathItem!.points).toBe("+5");
+
+    // Ankles verified: 20 * 1.0 = 20
+    const anklesItem = breakdown.find((b) => b.label.includes("Ankle-deep"));
+    expect(anklesItem).toBeDefined();
+    expect(anklesItem!.label).toBe("1 verified report (Ankle-deep ×1.0)");
+    expect(anklesItem!.points).toBe("+20");
+
+    // Knees unverified: 10 * 1.5 = 15
+    const kneesItem = breakdown.find((b) => b.label.includes("Knee-deep"));
+    expect(kneesItem).toBeDefined();
+    expect(kneesItem!.label).toBe("1 unverified report (Knee-deep ×1.5)");
+    expect(kneesItem!.points).toBe("+15");
+  });
+
+  it("accurately represents multiple reports with different depth levels without collapsing to one multiplier", () => {
+    const now = Date.now();
+    const testTileId = "t_10_10";
+
+    const customReports: FloodReport[] = [
+      {
+        id: "m1",
+        tileId: testTileId,
+        lat: 19.04,
+        lng: 72.87,
+        description: "Waist report",
+        severityUser: "WaistPlus",
+        createdAt: new Date(now - 10000).toISOString(),
+        status: "Unverified",
+      },
+      {
+        id: "m2",
+        tileId: testTileId,
+        lat: 19.04,
+        lng: 72.87,
+        description: "Knee report",
+        severityUser: "Knees",
+        createdAt: new Date(now - 10000).toISOString(),
+        status: "Unverified",
+      },
+    ];
+
+    const state: AppState = {
+      ...seedState(now),
+      reports: customReports,
+      incidents: [],
+    };
+
+    const tiles = computeTiles(state, now);
+    const tile = tiles.find((t) => t.id === testTileId)!;
+    const breakdown = getEnrichedBreakdown(tile, customReports, now);
+
+    const waistItem = breakdown.find((b) => b.label.includes("Waist-deep"));
+    const kneeItem = breakdown.find((b) => b.label.includes("Knee-deep"));
+
+    expect(waistItem).toBeDefined();
+    expect(kneeItem).toBeDefined();
+    expect(waistItem!.label).toBe("1 unverified report (Waist-deep ×2.0)");
+    expect(waistItem!.points).toBe("+20");
+    expect(kneeItem!.label).toBe("1 unverified report (Knee-deep ×1.5)");
+    expect(kneeItem!.points).toBe("+15");
+
+    // Sum of points should match 20 + 15 = 35 from reports
+    const reportTotal =
+      parseInt(waistItem!.points.replace("+", ""), 10) +
+      parseInt(kneeItem!.points.replace("+", ""), 10);
+    expect(reportTotal).toBe(35);
   });
 });

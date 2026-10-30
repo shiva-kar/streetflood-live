@@ -1,24 +1,12 @@
-import { useState } from "react";
-import {
-  LifeBuoy,
-  X,
-  Phone,
-  Home,
-  Car,
-  Users,
-  CheckCircle2,
-  MapPin,
-  ExternalLink,
-  AlertTriangle,
-  Building,
-  HeartHandshake,
-} from "lucide-react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { LifeBuoy, X, Phone, Building, AlertTriangle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CHECKLISTS, EMERGENCY_CONTACTS, SHELTERS } from "@/lib/flood/data";
+import { CHECKLISTS, EMERGENCY_CONTACTS } from "@/lib/flood/data";
 import { sheltersByDistance } from "@/lib/flood/engine";
 import { setState } from "@/lib/flood/store";
-import type { AppState, RiskLevel, Shelter, Tile } from "@/lib/flood/types";
+import type { AppState, RiskLevel, Tile } from "@/lib/flood/types";
 
 interface PreparednessModalProps {
   open: boolean;
@@ -38,7 +26,16 @@ export default function PreparednessModal({
   const [activeTab, setActiveTab] = useState<"shelters" | "contacts" | "checklists">("shelters");
   const [checklistTab, setChecklistTab] = useState<string>("household");
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") return null;
 
   const currentLat = selectedTile?.centerLat ?? 19.05;
   const currentLng = selectedTile?.centerLng ?? 72.87;
@@ -61,28 +58,31 @@ export default function PreparednessModal({
 
   const riskLevel: RiskLevel = selectedTile?.currentRiskLevel || "High";
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="prep-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 overflow-y-auto animate-in fade-in duration-150"
+      className="sf-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="relative w-full max-w-xl max-h-[90vh] rounded-xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden my-auto">
+      <div className="sf-modal-container w-full max-w-2xl my-auto animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-4 border-b bg-muted/40 flex items-start justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-destructive/10 text-destructive">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 font-bold">
               <LifeBuoy className="h-5 w-5" />
             </div>
             <div>
               <h2
                 id="prep-modal-title"
-                className="font-display font-bold text-base text-foreground"
+                className="font-display font-bold text-lg sm:text-xl text-slate-900 dark:text-slate-100"
               >
                 Emergency Preparedness & Evacuation
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Actionable safety checklists, relief shelters & emergency helplines
               </p>
             </div>
@@ -90,33 +90,34 @@ export default function PreparednessModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             aria-label="Close emergency modal"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Dynamic Contextual Guidance Banner */}
-        <div className="p-3 bg-destructive/10 border-b border-destructive/20 text-xs text-destructive-foreground">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-            <div className="text-foreground">
+        <div className="p-3.5 sm:p-4 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-800 text-xs sm:text-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <div className="text-slate-900 dark:text-slate-100">
               {riskLevel === "Critical" ? (
                 <>
-                  <strong className="font-bold text-destructive">
+                  <strong className="font-bold text-red-600 dark:text-red-400">
                     CRITICAL FLOOD RISK IN AREA:
                   </strong>{" "}
-                  Potentially dangerous water levels detected. Avoid all unnecessary travel. Move
-                  vulnerable family members to upper floors or nearest relief shelter immediately.
+                  Potentially dangerous water levels detected. Avoid all non-essential travel.
+                  Prepare to move vulnerable family members to upper floors or nearest relief
+                  shelter immediately.
                 </>
               ) : (
                 <>
                   <strong className="font-bold text-amber-600 dark:text-amber-400">
                     HIGH FLOOD RISK:
                   </strong>{" "}
-                  Water accumulation likely on roads. Move vehicles to elevated parking, turn off
-                  ground-floor power breakers if water enters, and keep essentials packed.
+                  Water accumulation likely on roads. Move vehicles to elevated ground, turn off
+                  ground-floor circuit breakers if water enters, and keep essentials packed.
                 </>
               )}
             </div>
@@ -124,25 +125,25 @@ export default function PreparednessModal({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b bg-muted/20 px-3">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-3 sm:px-5">
           <button
             type="button"
             onClick={() => setActiveTab("shelters")}
-            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all ${
+            className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all ${
               activeTab === "shelters"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-sky-600 text-sky-600 dark:text-sky-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
-            Emergency Shelters ({nearbyShelters.length})
+            Relief Shelters ({nearbyShelters.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("contacts")}
-            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all ${
+            className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all ${
               activeTab === "contacts"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-sky-600 text-sky-600 dark:text-sky-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             Emergency Contacts
@@ -150,61 +151,60 @@ export default function PreparednessModal({
           <button
             type="button"
             onClick={() => setActiveTab("checklists")}
-            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === "checklists"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-sky-600 text-sky-600 dark:text-sky-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
           >
             <span>Safety Checklists</span>
-            <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">
+            <Badge variant="secondary" className="text-xs px-1.5 py-0 font-mono font-bold">
               {checkedItems}/{totalItems}
             </Badge>
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-          {/* TAB 1: SHELTERS */}
+        {/* Modal Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-sm bg-white dark:bg-slate-900">
+          {/* TAB 1: RELIEF SHELTERS */}
           {activeTab === "shelters" && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between text-xs sm:text-sm text-slate-500">
                 <span>Relief centers sorted by distance from current location:</span>
-                <span className="text-[10px] italic">Simulated for demo</span>
+                <span className="italic">Simulated for demo</span>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {nearbyShelters.map((shelter) => (
                   <div
                     key={shelter.id}
-                    className="p-3 rounded-lg border border-border bg-background space-y-1.5 shadow-2xs hover:border-primary/50 transition-all"
+                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2 shadow-xs hover:border-sky-500/50 transition-all"
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <Building className="h-3.5 w-3.5 text-primary" />
-                          <h4 className="font-display font-bold text-sm text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-sky-600" />
+                          <h4 className="font-display font-bold text-base text-slate-900 dark:text-slate-100">
                             {shelter.name}
                           </h4>
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                           {shelter.address}
                         </p>
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="font-mono font-bold text-xs text-foreground">
+                        <span className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100">
                           {shelter.distanceKm.toFixed(2)} km
                         </span>
                         <div className="mt-1">
                           <Badge
-                            variant="outline"
-                            className={`text-[9px] px-1.5 py-0 border ${
+                            className={`text-xs px-2 py-0.5 font-bold ${
                               shelter.capacityStatus === "Space available"
-                                ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30"
+                                ? "bg-emerald-600 text-white"
                                 : shelter.capacityStatus === "Filling up"
-                                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30"
-                                  : "bg-red-500/15 text-red-800 dark:text-red-300 border-red-500/30"
+                                  ? "bg-amber-500 text-slate-900"
+                                  : "bg-red-600 text-white"
                             }`}
                           >
                             {shelter.capacityStatus}
@@ -213,9 +213,12 @@ export default function PreparednessModal({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-border/60">
-                      <span className="text-[10px] text-muted-foreground">
-                        Type: <span className="font-medium text-foreground">{shelter.kind}</span>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <span className="text-xs text-slate-500">
+                        Facility:{" "}
+                        <strong className="text-slate-700 dark:text-slate-300">
+                          {shelter.kind}
+                        </strong>
                       </span>
                       <Button
                         type="button"
@@ -225,9 +228,9 @@ export default function PreparednessModal({
                           onHighlightShelter(shelter.id);
                           onClose();
                         }}
-                        className="h-6 px-2 text-[11px] font-semibold gap-1 text-primary hover:text-primary"
+                        className="h-8 px-3 text-xs font-bold gap-1.5 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950"
                       >
-                        <MapPin className="h-3 w-3" />
+                        <MapPin className="h-3.5 w-3.5" />
                         <span>Locate on Map</span>
                       </Button>
                     </div>
@@ -239,33 +242,35 @@ export default function PreparednessModal({
 
           {/* TAB 2: EMERGENCY CONTACTS */}
           {activeTab === "contacts" && (
-            <div className="space-y-3">
-              <div className="text-[11px] text-muted-foreground">
-                Official Indian emergency response helplines (tap to call):
-              </div>
+            <div className="space-y-4">
+              <p className="text-xs sm:text-sm text-slate-500">
+                Official Indian emergency response helplines (tap to place a call):
+              </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {EMERGENCY_CONTACTS.map((c, i) => (
                   <div
                     key={i}
-                    className="p-3 rounded-lg border border-border bg-background flex items-center justify-between gap-2 shadow-2xs"
+                    className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between gap-3 shadow-xs"
                   >
                     <div>
-                      <div className="font-bold text-foreground text-xs">{c.label}</div>
-                      {c.note && <div className="text-[10px] text-muted-foreground">{c.note}</div>}
+                      <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                        {c.label}
+                      </div>
+                      {c.note && <div className="text-xs text-slate-500 mt-0.5">{c.note}</div>}
                     </div>
                     <a
                       href={`tel:${c.number}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-mono font-bold text-xs hover:bg-primary/90 transition-colors shadow-2xs shrink-0"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 text-white font-mono font-bold text-sm hover:bg-sky-700 transition-colors shadow-xs shrink-0"
                     >
-                      <Phone className="h-3.5 w-3.5" />
+                      <Phone className="h-4 w-4" />
                       <span>{c.number}</span>
                     </a>
                   </div>
                 ))}
               </div>
 
-              <div className="p-3 rounded-md bg-muted/40 text-[11px] text-muted-foreground border">
+              <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-xs sm:text-sm text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
                 <strong>Important:</strong> Keep your mobile phone charged and store emergency
                 numbers offline. In life-threatening emergencies, dial <strong>112</strong>{" "}
                 immediately.
@@ -277,30 +282,34 @@ export default function PreparednessModal({
           {activeTab === "checklists" && (
             <div className="space-y-4">
               {/* Progress Bar */}
-              <div className="space-y-1.5 bg-muted/30 p-2.5 rounded-lg border">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-foreground">Preparedness Readiness</span>
-                  <span className="font-mono font-bold text-primary">{progressPercent}%</span>
+              <div className="space-y-2 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    Preparedness Readiness Progress
+                  </span>
+                  <span className="font-mono font-bold text-sky-600 dark:text-sky-400">
+                    {progressPercent}% Complete
+                  </span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div className="h-2.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-300"
+                    className="h-full bg-sky-600 transition-all duration-300 rounded-full"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
               </div>
 
-              {/* Checklist Sub-tabs */}
-              <div className="flex gap-1.5 border-b pb-2">
+              {/* Sub-tabs */}
+              <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
                 {CHECKLISTS.map((c) => (
                   <button
                     type="button"
                     key={c.key}
                     onClick={() => setChecklistTab(c.key)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                       checklistTab === c.key
-                        ? "bg-secondary text-secondary-foreground font-bold"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
                     {c.title}
@@ -308,27 +317,29 @@ export default function PreparednessModal({
                 ))}
               </div>
 
-              {/* Items List */}
+              {/* Checklist Items */}
               <div className="space-y-2">
                 {CHECKLISTS.find((c) => c.key === checklistTab)?.items.map((item, idx) => {
                   const isChecked = !!state.checklist?.[item];
                   return (
                     <label
                       key={idx}
-                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                         isChecked
-                          ? "bg-emerald-500/10 border-emerald-500/30 text-foreground"
-                          : "bg-background border-border text-foreground hover:bg-muted/30"
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-slate-900 dark:text-slate-100"
+                          : "bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleCheck(item)}
-                        className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                       />
                       <span
-                        className={`text-xs ${isChecked ? "line-through text-muted-foreground" : ""}`}
+                        className={`text-sm ${
+                          isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""
+                        }`}
                       >
                         {item}
                       </span>
@@ -341,15 +352,19 @@ export default function PreparednessModal({
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t bg-muted/40 flex items-center justify-between text-xs">
-          <span className="text-[10px] text-muted-foreground">
-            Preparedness state auto-saved locally in browser.
-          </span>
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs text-slate-500">
+          <span>Preparedness checklist state auto-persisted in local browser storage.</span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="text-sm font-semibold border-slate-300 dark:border-slate-700"
+          >
             Done
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
