@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Plus, Navigation, LocateFixed, Sparkles, ShieldAlert, Sliders, X } from "lucide-react";
+import {
+  Plus,
+  Navigation,
+  LocateFixed,
+  Sparkles,
+  ShieldAlert,
+  Sliders,
+  X,
+  Compass,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import FloodMap from "@/components/flood/FloodMap";
@@ -476,31 +485,37 @@ function StreetFloodApp() {
             isAdmin={mode === "authority"}
           />
 
-          {/* Floating Map Controls (Top Left of Map Area) */}
-          <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 max-w-[calc(100%-120px)] sm:max-w-none pointer-events-auto">
+          {/* Floating Map Controls (Top Left of Map Area - Avoids top-right Map Layers icon) */}
+          <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 sm:gap-2 max-w-[calc(100vw-64px)] sm:max-w-none pointer-events-auto">
             {/* Quick Corridor Jump Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs no-scrollbar">
-              <span className="text-[11px] font-bold text-slate-400 uppercase shrink-0">Jump:</span>
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs no-scrollbar">
+              <span className="hidden sm:inline text-[11px] font-bold text-slate-400 uppercase shrink-0">
+                Jump:
+              </span>
+              <Compass className="sm:hidden h-3.5 w-3.5 text-slate-400 shrink-0" />
               {ZONES.map((z) => (
                 <button
                   type="button"
                   key={z.key}
                   onClick={() => handleJumpToZone(z.key)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors shrink-0"
+                  className="px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors shrink-0"
                 >
                   {z.label}
                 </button>
               ))}
             </div>
 
-            {/* Map Filter Controls */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Map Filter Controls (Icon-only on mobile to prevent overlapping) */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* 3-Hour Predictive Toggle */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs">
-                <Sparkles className="h-4 w-4 text-amber-500" />
+              <div
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs shrink-0"
+                title="3-Hour Predictive Risk Forecast"
+              >
+                <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
                 <label
                   htmlFor="pred-toggle"
-                  className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                  className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer select-none"
                 >
                   3h Predictive Risk
                 </label>
@@ -508,7 +523,8 @@ function StreetFloodApp() {
                   id="pred-toggle"
                   checked={showPredicted}
                   onCheckedChange={setShowPredicted}
-                  className="scale-90"
+                  className="scale-75 sm:scale-90"
+                  aria-label="3-Hour Predictive Risk Forecast"
                 />
               </div>
 
@@ -516,14 +532,16 @@ function StreetFloodApp() {
               <button
                 type="button"
                 onClick={() => setOnlyHighCritical(!onlyHighCritical)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-md backdrop-blur-md transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold shadow-md backdrop-blur-md transition-all shrink-0 ${
                   onlyHighCritical
                     ? "bg-red-600 text-white border-red-600"
                     : "bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
                 }`}
+                title="Filter Severe (High & Critical) Flooding Only"
+                aria-label="Filter Severe Flooding Only"
               >
-                <ShieldAlert className="h-4 w-4" />
-                <span>Severe Only</span>
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Severe Only</span>
               </button>
             </div>
           </div>
@@ -569,30 +587,32 @@ function StreetFloodApp() {
                 </Button>
               </div>
 
-              {/* Mobile Compact Floating Dock (< sm) */}
-              <div className="sm:hidden absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between gap-1.5 pointer-events-auto">
+              {/* Mobile Compact Icon-Only Dock (< sm: Clean icons, no overlapping) */}
+              <div className="sm:hidden absolute bottom-3 left-3 z-20 flex items-center gap-2 pointer-events-auto">
                 <Button
                   type="button"
-                  size="sm"
+                  size="icon"
                   onClick={() => setReportDialogOpen(true)}
-                  className="h-10 px-3.5 rounded-full font-bold shadow-lg gap-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs"
+                  className="h-10 w-10 rounded-full font-bold shadow-xl bg-sky-600 hover:bg-sky-700 text-white shrink-0"
+                  title="Report Flooding"
+                  aria-label="Report Flooding"
                 >
-                  <Plus className="h-4 w-4 stroke-[2.5]" />
-                  <span>Report</span>
+                  <Plus className="h-5 w-5 stroke-[2.5]" />
                 </Button>
 
                 <Button
                   type="button"
-                  size="sm"
+                  size="icon"
                   variant="outline"
                   onClick={() => {
                     setRoutePanelOpen(!routePanelOpen);
                     setMobileSheetOpen(true);
                   }}
-                  className="h-10 px-3.5 rounded-full font-bold shadow-lg gap-1.5 text-xs border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200"
+                  className="h-10 w-10 rounded-full font-bold shadow-xl border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-indigo-600 hover:bg-slate-50 shrink-0"
+                  title="Safe Evacuation Route"
+                  aria-label="Safe Evacuation Route"
                 >
-                  <Navigation className="h-4 w-4 text-indigo-600" />
-                  <span>Safe Route</span>
+                  <Navigation className="h-5 w-5" />
                 </Button>
 
                 <Button
@@ -600,8 +620,9 @@ function StreetFloodApp() {
                   size="icon"
                   variant="outline"
                   onClick={handleLocateMe}
-                  className="h-10 w-10 rounded-full shadow-lg bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 shrink-0"
+                  className="h-10 w-10 rounded-full shadow-xl bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 shrink-0"
                   title="Center on my location"
+                  aria-label="Center on my location"
                 >
                   <LocateFixed className="h-4 w-4" />
                 </Button>
@@ -609,112 +630,117 @@ function StreetFloodApp() {
             </>
           )}
 
-          {/* Map Legend (Bottom Right) */}
-          <MapLegend />
+          {/* Map Legend (Bottom Right - Hidden on mobile if bottom sheet is open) */}
+          {!mobileSheetOpen && <MapLegend />}
 
           {/* MOBILE BOTTOM SHEET & BACKDROP (Screens < lg) */}
           {mobileSheetOpen && (
             <>
-              <div 
-                className="lg:hidden absolute inset-0 bg-black/25 z-25 backdrop-blur-[1px] animate-in fade-in duration-150" 
-                onClick={() => setMobileSheetOpen(false)} 
+              <div
+                className="lg:hidden absolute inset-0 bg-black/25 z-25 backdrop-blur-[1px] animate-in fade-in duration-150"
+                onClick={() => setMobileSheetOpen(false)}
                 title="Tap to dismiss"
               />
               <div className="lg:hidden absolute inset-x-0 bottom-0 max-h-[75vh] z-30 flex flex-col rounded-t-2xl border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
-              <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 shrink-0" />
-              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                {mode === "authority" ? (
-                  <AuthorityDashboard
-                    state={effectiveState}
-                    tiles={tiles}
-                    onFocusTile={(id) => {
-                      const t = tiles.find((x) => x.id === id);
-                      if (t) {
-                        setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 17, key: Date.now() });
+                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 shrink-0" />
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                  {mode === "authority" ? (
+                    <AuthorityDashboard
+                      state={effectiveState}
+                      tiles={tiles}
+                      onFocusTile={(id) => {
+                        const t = tiles.find((x) => x.id === id);
+                        if (t) {
+                          setFocus({
+                            lat: t.centerLat,
+                            lng: t.centerLng,
+                            zoom: 17,
+                            key: Date.now(),
+                          });
+                          setSelectedTileId(id);
+                          setSelectedTileIds(new Set([id]));
+                        }
+                        setMobileSheetOpen(false);
+                      }}
+                      onOpenSimulation={() => setSimDrawerOpen(true)}
+                      onClose={() => setMobileSheetOpen(false)}
+                    />
+                  ) : routePanelOpen ? (
+                    <RoutePanel
+                      tiles={tiles}
+                      shelters={SHELTERS}
+                      reports={effectiveState.reports}
+                      incidents={effectiveState.incidents}
+                      roadRoute={roadRoute}
+                      shelterCandidates={shelterCandidates}
+                      selectedShelterId={selectedShelterId}
+                      fromId={routeFromId}
+                      toId={routeToId}
+                      navMode={navMode}
+                      pickMode={pickMode}
+                      isLoading={isRoutingLoading}
+                      onNavModeChange={setNavMode}
+                      onSelectFrom={setRouteFromId}
+                      onSelectTo={setRouteToId}
+                      onSelectShelter={(sId) => {
+                        setSelectedShelterId(sId);
+                        handleEvacuateToShelter(routeFromId || "t_2_4", sId);
+                      }}
+                      onCalculateRoadRoute={handleCalculateRoadRoute}
+                      onEvacuateToShelter={handleEvacuateToShelter}
+                      onClearRoute={() => {
+                        setRoadRoute(null);
+                        setRouteResult(null);
+                      }}
+                      onTogglePickMode={() => setPickMode(!pickMode)}
+                      onClose={() => {
+                        setRoutePanelOpen(false);
+                        setMobileSheetOpen(false);
+                      }}
+                      onOpenPreparedness={() => setPrepModalOpen(true)}
+                    />
+                  ) : selectedTile ? (
+                    <TileDetailsSheet
+                      tile={selectedTile}
+                      reports={effectiveState.reports}
+                      incident={selectedIncident}
+                      onClose={() => {
+                        setSelectedTileId(null);
+                        setMobileSheetOpen(false);
+                      }}
+                      onReportHere={(id) => {
                         setSelectedTileId(id);
-                        setSelectedTileIds(new Set([id]));
-                      }
-                      setMobileSheetOpen(false);
-                    }}
-                    onOpenSimulation={() => setSimDrawerOpen(true)}
-                    onClose={() => setMobileSheetOpen(false)}
-                  />
-                ) : routePanelOpen ? (
-                  <RoutePanel
-                    tiles={tiles}
-                    shelters={SHELTERS}
-                    reports={effectiveState.reports}
-                    incidents={effectiveState.incidents}
-                    roadRoute={roadRoute}
-                    shelterCandidates={shelterCandidates}
-                    selectedShelterId={selectedShelterId}
-                    fromId={routeFromId}
-                    toId={routeToId}
-                    navMode={navMode}
-                    pickMode={pickMode}
-                    isLoading={isRoutingLoading}
-                    onNavModeChange={setNavMode}
-                    onSelectFrom={setRouteFromId}
-                    onSelectTo={setRouteToId}
-                    onSelectShelter={(sId) => {
-                      setSelectedShelterId(sId);
-                      handleEvacuateToShelter(routeFromId || "t_2_4", sId);
-                    }}
-                    onCalculateRoadRoute={handleCalculateRoadRoute}
-                    onEvacuateToShelter={handleEvacuateToShelter}
-                    onClearRoute={() => {
-                      setRoadRoute(null);
-                      setRouteResult(null);
-                    }}
-                    onTogglePickMode={() => setPickMode(!pickMode)}
-                    onClose={() => {
-                      setRoutePanelOpen(false);
-                      setMobileSheetOpen(false);
-                    }}
-                    onOpenPreparedness={() => setPrepModalOpen(true)}
-                  />
-                ) : selectedTile ? (
-                  <TileDetailsSheet
-                    tile={selectedTile}
-                    reports={effectiveState.reports}
-                    incident={selectedIncident}
-                    onClose={() => {
-                      setSelectedTileId(null);
-                      setMobileSheetOpen(false);
-                    }}
-                    onReportHere={(id) => {
-                      setSelectedTileId(id);
-                      setReportDialogOpen(true);
-                    }}
-                    onRouteFrom={(id) => {
-                      setRouteFromId(id);
-                      setRoutePanelOpen(true);
-                      if (routeToId) handleCalculateRoute(id, routeToId);
-                    }}
-                    onRouteTo={(id) => {
-                      setRouteToId(id);
-                      setRoutePanelOpen(true);
-                      if (routeFromId) handleCalculateRoute(routeFromId, id);
-                    }}
-                    onOpenPreparedness={() => setPrepModalOpen(true)}
-                  />
-                ) : (
-                  <CorridorOverview
-                    tiles={tiles}
-                    state={effectiveState}
-                    alerts={allAlerts}
-                    onSelectZone={(z) => {
-                      handleJumpToZone(z);
-                      setMobileSheetOpen(false);
-                    }}
-                    onOpenReport={() => setReportDialogOpen(true)}
-                    onOpenRoute={() => setRoutePanelOpen(true)}
-                    onOpenPreparedness={() => setPrepModalOpen(true)}
-                    onClose={() => setMobileSheetOpen(false)}
-                  />
-                )}
+                        setReportDialogOpen(true);
+                      }}
+                      onRouteFrom={(id) => {
+                        setRouteFromId(id);
+                        setRoutePanelOpen(true);
+                        if (routeToId) handleCalculateRoute(id, routeToId);
+                      }}
+                      onRouteTo={(id) => {
+                        setRouteToId(id);
+                        setRoutePanelOpen(true);
+                        if (routeFromId) handleCalculateRoute(routeFromId, id);
+                      }}
+                      onOpenPreparedness={() => setPrepModalOpen(true)}
+                    />
+                  ) : (
+                    <CorridorOverview
+                      tiles={tiles}
+                      state={effectiveState}
+                      alerts={allAlerts}
+                      onSelectZone={(z) => {
+                        handleJumpToZone(z);
+                        setMobileSheetOpen(false);
+                      }}
+                      onOpenReport={() => setReportDialogOpen(true)}
+                      onOpenRoute={() => setRoutePanelOpen(true)}
+                      onOpenPreparedness={() => setPrepModalOpen(true)}
+                      onClose={() => setMobileSheetOpen(false)}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
             </>
           )}
         </main>
