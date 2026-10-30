@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/flood/engine";
 import type { FloodReport, RoadIncident, Tile } from "@/lib/flood/types";
+import { getEnrichedBreakdown } from "./breakdownHelper";
 
 interface TileDetailsSheetProps {
   tile: Tile | null;
@@ -73,6 +74,7 @@ export default function TileDetailsSheet({
   const photos = tileReports.map((r) => r.photoUrl).filter(Boolean) as string[];
   const config = RISK_CONFIG[tile.currentRiskLevel] || RISK_CONFIG.Low;
   const isHighOrCritical = tile.currentRiskLevel === "High" || tile.currentRiskLevel === "Critical";
+  const breakdownItems = getEnrichedBreakdown(tile, reports);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden">
@@ -136,7 +138,7 @@ export default function TileDetailsSheet({
         </div>
 
         {/* Severity Calculation Point Breakdown */}
-        {tile.severityBreakdown.length > 0 && (
+        {breakdownItems.length > 0 && (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -145,20 +147,17 @@ export default function TileDetailsSheet({
               <span className="text-xs text-slate-500">Official weighted formula</span>
             </div>
             <ul className="space-y-1.5 pt-1">
-              {tile.severityBreakdown.map((item, idx) => {
-                const parts = item.split(":");
-                return (
-                  <li
-                    key={idx}
-                    className="flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-slate-400"
-                  >
-                    <span>• {parts[0]}</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
-                      {parts[1] || ""}
-                    </span>
-                  </li>
-                );
-              })}
+              {breakdownItems.map((item, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-slate-400"
+                >
+                  <span>• {item.label}</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    {item.points}
+                  </span>
+                </li>
+              ))}
             </ul>
           </div>
         )}

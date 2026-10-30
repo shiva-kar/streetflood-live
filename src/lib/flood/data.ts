@@ -82,6 +82,8 @@ export const SHELTERS: Shelter[] = [
     lng: 72.8655,
     kind: "School",
     capacityStatus: "Space available",
+    provenance: "Simulated Demo",
+    accessibilityNote: "Ground-floor ramp access; emergency medical desk (simulated)",
   },
   {
     id: "sh2",
@@ -91,6 +93,8 @@ export const SHELTERS: Shelter[] = [
     lng: 72.879,
     kind: "Community Hall",
     capacityStatus: "Filling up",
+    provenance: "Simulated Demo",
+    accessibilityNote: "Elevated community hall; food and dry relief point (simulated)",
   },
   {
     id: "sh3",
@@ -100,6 +104,8 @@ export const SHELTERS: Shelter[] = [
     lng: 72.8745,
     kind: "Municipal Building",
     capacityStatus: "Space available",
+    provenance: "Simulated Demo",
+    accessibilityNote: "Municipal administration building; high elevation (simulated)",
   },
   {
     id: "sh4",
@@ -109,6 +115,8 @@ export const SHELTERS: Shelter[] = [
     lng: 72.8655,
     kind: "School",
     capacityStatus: "Near capacity",
+    provenance: "Simulated Demo",
+    accessibilityNote: "Multi-story education complex; emergency bedding (simulated)",
   },
   {
     id: "sh5",
@@ -118,6 +126,83 @@ export const SHELTERS: Shelter[] = [
     lng: 72.8712,
     kind: "Community Hall",
     capacityStatus: "Space available",
+    provenance: "Simulated Demo",
+    accessibilityNote: "Direct access from elevated link road corridor (simulated)",
+  },
+];
+
+export interface StaticRoadCorridor {
+  id: string;
+  name: string;
+  roadName: string;
+  coordinates: [number, number][]; // [lat, lng]
+  typicalBottleneck: string;
+}
+
+export const AFFECTED_ROAD_CORRIDORS: StaticRoadCorridor[] = [
+  {
+    id: "corridor_lbs_subway",
+    name: "Kurla Station / LBS Marg Subway",
+    roadName: "Lal Bahadur Shastri (LBS) Marg",
+    coordinates: [
+      [19.0615, 72.8735],
+      [19.0598, 72.8752],
+      [19.0588, 72.8765],
+      [19.0575, 72.875],
+      [19.055, 72.8732],
+      [19.053, 72.871],
+    ],
+    typicalBottleneck: "Kurla Station Railway Underpass (subway) prone to rapid 3-4ft waterlogging",
+  },
+  {
+    id: "corridor_sion_circle",
+    name: "Sion Circle Roundabout & Link",
+    roadName: "Sion Circle / Sion–Bandra Link Road",
+    coordinates: [
+      [19.0425, 72.8615],
+      [19.0435, 72.8625],
+      [19.045, 72.864],
+      [19.0465, 72.866],
+      [19.048, 72.8675],
+    ],
+    typicalBottleneck: "Sion Circle low-lying depression; stalls two-wheelers and autos",
+  },
+  {
+    id: "corridor_cst_road",
+    name: "CST Road Arterial Connection",
+    roadName: "Chhatrapati Shivaji Terminus (CST) Road",
+    coordinates: [
+      [19.0525, 72.8685],
+      [19.0545, 72.871],
+      [19.0565, 72.8735],
+      [19.058, 72.8755],
+    ],
+    typicalBottleneck: "Primary connecting link between BKC, Chunabhatti and Kurla West",
+  },
+  {
+    id: "corridor_swadeshi_mills",
+    name: "Swadeshi Mills / Chunabhatti Nullah",
+    roadName: "Swadeshi Mills Road",
+    coordinates: [
+      [19.0478, 72.8735],
+      [19.0485, 72.8765],
+      [19.0495, 72.8795],
+      [19.0515, 72.881],
+    ],
+    typicalBottleneck: "Chunabhatti nullah overflow stretch along Central Railway tracks",
+  },
+  {
+    id: "corridor_mithi_perimeter",
+    name: "Mithi River Low-Lying Edge",
+    roadName: "Sant Rohidas Marg (Mithi River Edge)",
+    coordinates: [
+      [19.0435, 72.8625],
+      [19.047, 72.8632],
+      [19.0505, 72.8638],
+      [19.054, 72.8642],
+      [19.0565, 72.8648],
+    ],
+    typicalBottleneck: "Low-lying river wall stretch; high-tide river backwater accumulation",
   },
 ];
 
@@ -179,7 +264,7 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 18),
       status: "Verified",
       reviewedAt: ago(now, 10),
-      photoUrl: "/images/demo-flood-1.jpg",
+      photoUrl: `${import.meta.env.BASE_URL}images/demo-flood-1.jpg`,
     },
     {
       id: "r2",
@@ -211,7 +296,7 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 12),
       status: "Verified",
       reviewedAt: ago(now, 6),
-      photoUrl: "/images/demo-flood-2.jpg",
+      photoUrl: `${import.meta.env.BASE_URL}images/demo-flood-2.jpg`,
     },
     {
       id: "r5",

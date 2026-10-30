@@ -44,8 +44,14 @@ const DEPTH_OPTIONS: { value: WaterDepth; label: string; desc: string; icon: str
 ];
 
 const DEMO_PHOTOS = [
-  { label: "Sample: Waterlogged Street", url: "/images/demo-flood-1.jpg" },
-  { label: "Sample: Submerged Subway", url: "/images/demo-flood-2.jpg" },
+  {
+    label: "Sample: Waterlogged Street",
+    url: `${import.meta.env.BASE_URL}images/demo-flood-1.jpg`,
+  },
+  {
+    label: "Sample: Submerged Subway",
+    url: `${import.meta.env.BASE_URL}images/demo-flood-2.jpg`,
+  },
 ];
 
 export default function ReportDialog({

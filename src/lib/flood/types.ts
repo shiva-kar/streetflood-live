@@ -84,6 +84,66 @@ export interface Shelter {
   lng: number;
   kind: "School" | "Community Hall" | "Municipal Building";
   capacityStatus: "Space available" | "Filling up" | "Near capacity";
+  provenance?: "Official Verified" | "Community Reported" | "Simulated Demo";
+  accessibilityNote?: string;
+}
+
+export interface RoadRouteStep {
+  instruction: string;
+  streetName: string;
+  distanceMeters: number;
+  durationSeconds: number;
+}
+
+export interface RoadRouteResult {
+  coordinates: [number, number][]; // [lat, lng]
+  distanceKm: number;
+  durationMinutes: number;
+  steps: RoadRouteStep[];
+  safetyScore: number; // 0 - 100
+  safetyStatus: "Safe" | "Caution" | "HighRisk" | "Impassable";
+  safetyMessage: string;
+  blockedByClosure?: {
+    incidentId: string;
+    description: string;
+    location: string;
+  };
+  counts: Record<RiskLevel, number>;
+  dangerWarnings: string[];
+  isAlternative?: boolean;
+  provider: "OSRM" | "CorridorFallback" | "Unavailable";
+  summaryText?: string;
+}
+
+export interface ShelterCandidate {
+  shelter: Shelter;
+  route: RoadRouteResult | null;
+  isRecommended: boolean;
+  rejectionReason?: string;
+  roadDistanceKm?: number;
+  roadDurationMinutes?: number;
+}
+
+export interface MapLayerOptions {
+  showTechnicalGrid: boolean;
+  showAffectedRoads: boolean;
+  showClosures: boolean;
+  showShelters: boolean;
+  showEvacuationRoute: boolean;
+  showReports: boolean;
+}
+
+export interface RoadSegment {
+  id: string;
+  name: string;
+  coordinates: [number, number][]; // [lat, lng][]
+  riskLevel: RiskLevel;
+  waterDepth?: WaterDepth;
+  statusDescription?: string;
+  closure?: IncidentStatus;
+  lastUpdated?: string;
+  source: "Municipal Verified" | "Field Sensor" | "Citizen Report" | "Simulated Baseline";
+  precautions: string[];
 }
 
 export interface Simulation {

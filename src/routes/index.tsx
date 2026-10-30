@@ -15,11 +15,19 @@ import PreparednessModal from "@/components/flood/PreparednessModal";
 import SimulationDrawer from "@/components/flood/SimulationDrawer";
 import AuthorityDashboard from "@/components/flood/AuthorityDashboard";
 import MapLegend from "@/components/flood/MapLegend";
+import MapLayerControls from "@/components/flood/MapLayerControls";
 import { useAppState, getState } from "@/lib/flood/store";
-import { computeTiles, planRoute, predictiveAlerts, type RouteResult } from "@/lib/flood/engine";
+import {
+  computeTiles,
+  planRoute,
+  predictiveAlerts,
+  tileAt,
+  type RouteResult,
+} from "@/lib/flood/engine";
+import { calculateRoadRoute, findBestShelterEvacuation } from "@/lib/flood/roadRouting";
 import { MAP_CENTER, SHELTERS, ZONES } from "@/lib/flood/data";
 import { toast } from "sonner";
-import type { Tile } from "@/lib/flood/types";
+import type { MapLayerOptions, RoadRouteResult, ShelterCandidate, Tile } from "@/lib/flood/types";
 
 export const Route = createFileRoute("/")({
   component: StreetFloodApp,
@@ -50,11 +58,26 @@ function StreetFloodApp() {
   } | null>(null);
   const [userPos, setUserPos] = useState<[number, number] | null>([19.048, 72.868]);
 
-  // Route State
+  // Route State - Road-Based Evacuation & Navigation
   const [routeFromId, setRouteFromId] = useState<string | null>("t_2_4");
   const [routeToId, setRouteToId] = useState<string | null>("t_20_16");
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
+  const [roadRoute, setRoadRoute] = useState<RoadRouteResult | null>(null);
+  const [shelterCandidates, setShelterCandidates] = useState<ShelterCandidate[]>([]);
+  const [selectedShelterId, setSelectedShelterId] = useState<string | null>("sh1");
+  const [navMode, setNavMode] = useState<"evacuate" | "custom">("evacuate");
+  const [isRoutingLoading, setIsRoutingLoading] = useState(false);
   const [pickMode, setPickMode] = useState(false);
+
+  // Map Layer Controls State (Technical Grid ON by default with road corridors)
+  const [layerOptions, setLayerOptions] = useState<MapLayerOptions>({
+    showTechnicalGrid: true,
+    showAffectedRoads: true,
+    showClosures: true,
+    showShelters: true,
+    showEvacuationRoute: true,
+    showReports: true,
+  });
 
   // Modal / Drawer visibility
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
@@ -107,29 +130,128 @@ function StreetFloodApp() {
     return effectiveState.incidents.find((i) => i.tileId === selectedTileId) || null;
   }, [effectiveState.incidents, selectedTileId]);
 
-  // Calculate safe route
+  // Calculate road route via real street network & flood evaluation layer
+  const handleCalculateRoadRoute = useCallback(
+    async (from: string, to: string) => {
+      setIsRoutingLoading(true);
+      const fromTile = tiles.find((t) => t.id === from);
+      const toTile = tiles.find((t) => t.id === to);
+      if (!fromTile || !toTile) {
+        setIsRoutingLoading(false);
+        return;
+      }
+
+      const res = await calculateRoadRoute(
+        { lat: fromTile.centerLat, lng: fromTile.centerLng },
+        { lat: toTile.centerLat, lng: toTile.centerLng },
+        tiles,
+        effectiveState.reports,
+        effectiveState.incidents,
+      );
+
+      setRoadRoute(res);
+      setIsRoutingLoading(false);
+
+      if (res.safetyStatus === "Impassable") {
+        toast.error(
+          "NO SUFFICIENTLY SAFE ROUTE FOUND: Corridor blocked by closure or critical flooding.",
+        );
+      } else if (res.safetyStatus === "HighRisk") {
+        toast.warning("Caution: Road route passes through high waterlogging segments.");
+      } else {
+        toast.success(
+          `Road route calculated: ${res.distanceKm.toFixed(1)} km (~${res.durationMinutes} mins) following street network.`,
+        );
+      }
+    },
+    [tiles, effectiveState.reports, effectiveState.incidents],
+  );
+
+  // Evacuate to Nearest/Safest Relief Shelter
+  const handleEvacuateToShelter = useCallback(
+    async (from: string, targetShelterId?: string) => {
+      setIsRoutingLoading(true);
+      const fromTile = tiles.find((t) => t.id === from);
+      const originCoord = fromTile
+        ? { lat: fromTile.centerLat, lng: fromTile.centerLng }
+        : { lat: 19.0455, lng: 72.8655 };
+
+      const { recommended, candidates } = await findBestShelterEvacuation(
+        originCoord,
+        SHELTERS,
+        tiles,
+        effectiveState.reports,
+        effectiveState.incidents,
+      );
+
+      setShelterCandidates(candidates);
+
+      const targetCandidate = targetShelterId
+        ? candidates.find((c) => c.shelter.id === targetShelterId) || recommended
+        : recommended;
+
+      if (targetCandidate?.route) {
+        setRoadRoute(targetCandidate.route);
+        setSelectedShelterId(targetCandidate.shelter.id);
+        const targetTileId = tileAt(targetCandidate.shelter.lat, targetCandidate.shelter.lng);
+        if (targetTileId) setRouteToId(targetTileId);
+
+        if (targetCandidate.route.safetyStatus === "Impassable") {
+          toast.error(
+            "Warning: Candidate road route to this shelter encounters road closures or critical inundation.",
+          );
+        } else {
+          toast.success(
+            `Evacuation route calculated: ${targetCandidate.shelter.name} (${targetCandidate.route.distanceKm.toFixed(1)} km road route, ~${targetCandidate.route.durationMinutes} mins)`,
+          );
+        }
+      }
+      setIsRoutingLoading(false);
+    },
+    [tiles, effectiveState.reports, effectiveState.incidents],
+  );
+
+  // Internal grid routing fallback
   const handleCalculateRoute = useCallback(
     (from: string, to: string) => {
       const res = planRoute(tiles, from, to);
-      if (!res) {
-        toast.error("No traversable route found due to impassable flood blockades.");
-        setRouteResult(null);
-        return;
-      }
       setRouteResult(res);
-      toast.success(
-        `Safe route calculated: ${res.distanceKm.toFixed(1)} km avoiding flooded segments.`,
-      );
+      handleCalculateRoadRoute(from, to);
     },
-    [tiles],
+    [tiles, handleCalculateRoadRoute],
   );
 
   // Auto calculate route when route panel opens
   useEffect(() => {
-    if (routePanelOpen && !routeResult && routeFromId && routeToId) {
-      handleCalculateRoute(routeFromId, routeToId);
+    if (routePanelOpen && !roadRoute) {
+      if (navMode === "evacuate") {
+        handleEvacuateToShelter(routeFromId || "t_2_4", selectedShelterId || undefined);
+      } else if (routeFromId && routeToId) {
+        handleCalculateRoadRoute(routeFromId, routeToId);
+      }
     }
-  }, [routePanelOpen, routeResult, routeFromId, routeToId, handleCalculateRoute]);
+  }, [
+    routePanelOpen,
+    roadRoute,
+    navMode,
+    routeFromId,
+    routeToId,
+    selectedShelterId,
+    handleEvacuateToShelter,
+    handleCalculateRoadRoute,
+  ]);
+
+  // Recalculate route when flood state (rainfall, reports, incidents) changes
+  useEffect(() => {
+    if (routePanelOpen && roadRoute && routeFromId) {
+      if (navMode === "evacuate") {
+        handleEvacuateToShelter(routeFromId, selectedShelterId || undefined);
+      } else if (routeToId) {
+        handleCalculateRoadRoute(routeFromId, routeToId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveState.reports, effectiveState.incidents, effectiveState.sim.tick]);
 
   // Map Tile Click
   const handleTileClick = (tileId: string, lat: number, lng: number) => {
@@ -141,7 +263,11 @@ function StreetFloodApp() {
         setRouteToId(tileId);
         toast.info("Destination (B) set from map click.");
         setPickMode(false);
-        handleCalculateRoute(routeFromId, tileId);
+        if (navMode === "custom") {
+          handleCalculateRoadRoute(routeFromId, tileId);
+        } else {
+          handleEvacuateToShelter(tileId, selectedShelterId || undefined);
+        }
       }
       return;
     }
@@ -155,7 +281,11 @@ function StreetFloodApp() {
   // Shelter click
   const handleShelterClick = (shelterId: string) => {
     setHighlightShelterId(shelterId);
-    setPrepModalOpen(true);
+    setSelectedShelterId(shelterId);
+    setNavMode("evacuate");
+    setRoutePanelOpen(true);
+    setMobileSheetOpen(true);
+    handleEvacuateToShelter(routeFromId || "t_2_4", shelterId);
   };
 
   // Zone Quick Jump
@@ -244,16 +374,33 @@ function StreetFloodApp() {
           ) : routePanelOpen ? (
             <RoutePanel
               tiles={tiles}
-              routeResult={routeResult}
+              shelters={SHELTERS}
+              reports={effectiveState.reports}
+              incidents={effectiveState.incidents}
+              roadRoute={roadRoute}
+              shelterCandidates={shelterCandidates}
+              selectedShelterId={selectedShelterId}
               fromId={routeFromId}
               toId={routeToId}
+              navMode={navMode}
               pickMode={pickMode}
+              isLoading={isRoutingLoading}
+              onNavModeChange={setNavMode}
               onSelectFrom={setRouteFromId}
               onSelectTo={setRouteToId}
-              onCalculateRoute={handleCalculateRoute}
-              onClearRoute={() => setRouteResult(null)}
+              onSelectShelter={(sId) => {
+                setSelectedShelterId(sId);
+                handleEvacuateToShelter(routeFromId || "t_2_4", sId);
+              }}
+              onCalculateRoadRoute={handleCalculateRoadRoute}
+              onEvacuateToShelter={handleEvacuateToShelter}
+              onClearRoute={() => {
+                setRoadRoute(null);
+                setRouteResult(null);
+              }}
               onTogglePickMode={() => setPickMode(!pickMode)}
               onClose={() => setRoutePanelOpen(false)}
+              onOpenPreparedness={() => setPrepModalOpen(true)}
             />
           ) : selectedTile ? (
             <TileDetailsSheet
@@ -299,8 +446,12 @@ function StreetFloodApp() {
             shelters={SHELTERS}
             alertTileIds={alertTileIds}
             routePath={routeResult?.path || null}
+            roadRouteCoords={roadRoute?.coordinates || null}
+            roadRouteSafety={roadRoute?.safetyStatus}
             routeFromId={routeFromId}
             routeToId={routeToId}
+            isShelterDestination={navMode === "evacuate"}
+            layerOptions={layerOptions}
             selectedTileId={selectedTileId}
             selectedTileIds={selectedTileIds}
             pulseTileId={pulseTileId}
@@ -314,6 +465,13 @@ function StreetFloodApp() {
             onTileClick={handleTileClick}
             onShelterClick={handleShelterClick}
             onViewportChange={setViewportTileIds}
+          />
+
+          {/* Map Layer Controls (Feature 5 & 10: Toggle Technical Grid, Roads, Closures, Shelters) */}
+          <MapLayerControls
+            options={layerOptions}
+            onChange={setLayerOptions}
+            isAdmin={mode === "authority"}
           />
 
           {/* Floating Map Controls (Top Left of Map Area) */}
@@ -436,19 +594,36 @@ function StreetFloodApp() {
                 ) : routePanelOpen ? (
                   <RoutePanel
                     tiles={tiles}
-                    routeResult={routeResult}
+                    shelters={SHELTERS}
+                    reports={effectiveState.reports}
+                    incidents={effectiveState.incidents}
+                    roadRoute={roadRoute}
+                    shelterCandidates={shelterCandidates}
+                    selectedShelterId={selectedShelterId}
                     fromId={routeFromId}
                     toId={routeToId}
+                    navMode={navMode}
                     pickMode={pickMode}
+                    isLoading={isRoutingLoading}
+                    onNavModeChange={setNavMode}
                     onSelectFrom={setRouteFromId}
                     onSelectTo={setRouteToId}
-                    onCalculateRoute={handleCalculateRoute}
-                    onClearRoute={() => setRouteResult(null)}
+                    onSelectShelter={(sId) => {
+                      setSelectedShelterId(sId);
+                      handleEvacuateToShelter(routeFromId || "t_2_4", sId);
+                    }}
+                    onCalculateRoadRoute={handleCalculateRoadRoute}
+                    onEvacuateToShelter={handleEvacuateToShelter}
+                    onClearRoute={() => {
+                      setRoadRoute(null);
+                      setRouteResult(null);
+                    }}
                     onTogglePickMode={() => setPickMode(!pickMode)}
                     onClose={() => {
                       setRoutePanelOpen(false);
                       setMobileSheetOpen(false);
                     }}
+                    onOpenPreparedness={() => setPrepModalOpen(true)}
                   />
                 ) : selectedTile ? (
                   <TileDetailsSheet
