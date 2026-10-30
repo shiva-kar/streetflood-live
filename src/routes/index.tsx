@@ -1,24 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import {
-  Plus,
-  Navigation,
-  LocateFixed,
-  Filter,
-  Sparkles,
-  MapPin,
-  LifeBuoy,
-  Layers,
-  ChevronRight,
-  ShieldAlert,
-} from "lucide-react";
+import { Plus, Navigation, LocateFixed, Sparkles, ShieldAlert, Sliders, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import FloodMap from "@/components/flood/FloodMap";
 import Header from "@/components/flood/Header";
 import SafetyBanner from "@/components/flood/SafetyBanner";
 import TileDetailsSheet from "@/components/flood/TileDetailsSheet";
+import CorridorOverview from "@/components/flood/CorridorOverview";
 import ReportDialog from "@/components/flood/ReportDialog";
 import RoutePanel from "@/components/flood/RoutePanel";
 import AlertsDrawer from "@/components/flood/AlertsDrawer";
@@ -49,7 +38,7 @@ function StreetFloodApp() {
 
   // Selection & Focus
   const [selectedTileId, setSelectedTileId] = useState<string | null>("t_20_16");
-  const [selectedTileIds, setSelectedTileIds] = useState<Set<string>>(new Set());
+  const [selectedTileIds, setSelectedTileIds] = useState<Set<string>>(new Set(["t_20_16"]));
   const [pulseTileId, setPulseTileId] = useState<string | null>(null);
   const [highlightShelterId, setHighlightShelterId] = useState<string | null>(null);
   const [viewportTileIds, setViewportTileIds] = useState<Set<string>>(new Set());
@@ -68,13 +57,16 @@ function StreetFloodApp() {
   const [pickMode, setPickMode] = useState(false);
 
   // Modal / Drawer visibility
-  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
   const [prepModalOpen, setPrepModalOpen] = useState(false);
   const [simDrawerOpen, setSimDrawerOpen] = useState(false);
 
-  // Time ticker for freshness
+  // Mobile Bottom Sheet expanded state
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+
+  // Time ticker
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15000);
@@ -91,16 +83,17 @@ function StreetFloodApp() {
     return [...effectiveState.alerts, ...auto];
   }, [tiles, effectiveState, now]);
 
-  // Alert tile IDs set for map markers
+  // ONLY targeted municipal official alerts should have tile badges!
+  // NEVER include zone-wide predictive alerts that cover hundreds of tiles!
   const alertTileIds = useMemo(() => {
     const set = new Set<string>();
-    for (const a of allAlerts) {
-      if (a.status === "Published") {
+    for (const a of effectiveState.alerts) {
+      if (a.status === "Published" && a.type === "Municipal") {
         a.tileIds.forEach((id) => set.add(id));
       }
     }
     return set;
-  }, [allAlerts]);
+  }, [effectiveState.alerts]);
 
   // Currently selected tile object
   const selectedTile = useMemo(() => {
@@ -131,7 +124,7 @@ function StreetFloodApp() {
     [tiles],
   );
 
-  // Auto calculate route when panel opens if not yet calculated
+  // Auto calculate route when route panel opens
   useEffect(() => {
     if (routePanelOpen && !routeResult && routeFromId && routeToId) {
       handleCalculateRoute(routeFromId, routeToId);
@@ -140,8 +133,23 @@ function StreetFloodApp() {
 
   // Map Tile Click
   const handleTileClick = (tileId: string, lat: number, lng: number) => {
+    if (pickMode) {
+      if (!routeFromId) {
+        setRouteFromId(tileId);
+        toast.info("Origin (A) set from map click.");
+      } else {
+        setRouteToId(tileId);
+        toast.info("Destination (B) set from map click.");
+        setPickMode(false);
+        handleCalculateRoute(routeFromId, tileId);
+      }
+      return;
+    }
+
     setSelectedTileId(tileId);
     setSelectedTileIds(new Set([tileId]));
+    setRoutePanelOpen(false);
+    setMobileSheetOpen(true);
   };
 
   // Shelter click
@@ -160,6 +168,8 @@ function StreetFloodApp() {
     if (t) {
       setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 16, key: Date.now() });
       setSelectedTileId(t.id);
+      setSelectedTileIds(new Set([t.id]));
+      setRoutePanelOpen(false);
     }
   };
 
@@ -172,218 +182,320 @@ function StreetFloodApp() {
           const lng = pos.coords.longitude;
           setUserPos([lat, lng]);
           setFocus({ lat, lng, zoom: 16, key: Date.now() });
-          toast.success("Centered on your current GPS location.");
+          toast.success("Centered on your GPS location.");
         },
         () => {
-          // Fallback to default demo user coordinate in Sion-Kurla
           setUserPos([19.048, 72.868]);
           setFocus({ lat: 19.048, lng: 72.868, zoom: 16, key: Date.now() });
-          toast.info("Using demo location in Sion–Kurla corridor.");
+          toast.info("Centered on Sion–Kurla corridor.");
         },
       );
     }
   };
 
   return (
-    <div className="relative flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground font-sans select-none">
-      {/* 1. Header Navigation */}
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      {/* 1. Top Persistent Header */}
       <Header
         mode={mode}
-        onModeChange={setMode}
+        onModeChange={(m) => {
+          setMode(m);
+          if (m === "authority") {
+            setRoutePanelOpen(false);
+            setMobileSheetOpen(true);
+          }
+        }}
         state={effectiveState}
         tiles={tiles}
         alerts={allAlerts.filter((a) => a.status === "Published")}
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
-        onOpenRoute={() => setRoutePanelOpen((prev) => !prev)}
+        onOpenRoute={() => {
+          setRoutePanelOpen((prev) => !prev);
+          setMobileSheetOpen(true);
+        }}
         onOpenPreparedness={() => setPrepModalOpen(true)}
         onOpenSimulation={() => setSimDrawerOpen(true)}
       />
 
-      {/* 2. Top Disclaimer Banner */}
+      {/* 2. Safety Prototype Notice Banner */}
       <SafetyBanner />
 
-      {/* 3. Main Map Viewport */}
-      <main className="relative flex-1 w-full h-full overflow-hidden">
-        <FloodMap
-          tiles={tiles}
-          reports={effectiveState.reports}
-          incidents={effectiveState.incidents}
-          shelters={SHELTERS}
-          alertTileIds={alertTileIds}
-          routePath={routeResult?.path || null}
-          routeFromId={routeFromId}
-          routeToId={routeToId}
-          selectedTileId={selectedTileId}
-          selectedTileIds={selectedTileIds}
-          pulseTileId={pulseTileId}
-          highlightShelterId={highlightShelterId}
-          showPredicted={showPredicted}
-          onlyHighCritical={onlyHighCritical}
-          showReports={showReportsFilter}
-          userPos={userPos}
-          focus={focus}
-          pickMode={pickMode}
-          onTileClick={handleTileClick}
-          onShelterClick={handleShelterClick}
-          onViewportChange={setViewportTileIds}
-        />
+      {/* 3. Main Workspace Layout */}
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
+        {/* DESKTOP SIDE PANEL (Always visible on lg+ screens) */}
+        <aside
+          aria-label="Contextual Command Panel"
+          className="hidden lg:flex w-[420px] xl:w-[460px] h-full flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg z-20 shrink-0 overflow-hidden"
+        >
+          {mode === "authority" ? (
+            <AuthorityDashboard
+              state={effectiveState}
+              tiles={tiles}
+              onFocusTile={(id) => {
+                const t = tiles.find((x) => x.id === id);
+                if (t) {
+                  setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 17, key: Date.now() });
+                  setSelectedTileId(id);
+                  setSelectedTileIds(new Set([id]));
+                }
+              }}
+              onOpenSimulation={() => setSimDrawerOpen(true)}
+            />
+          ) : routePanelOpen ? (
+            <RoutePanel
+              tiles={tiles}
+              routeResult={routeResult}
+              fromId={routeFromId}
+              toId={routeToId}
+              pickMode={pickMode}
+              onSelectFrom={setRouteFromId}
+              onSelectTo={setRouteToId}
+              onCalculateRoute={handleCalculateRoute}
+              onClearRoute={() => setRouteResult(null)}
+              onTogglePickMode={() => setPickMode(!pickMode)}
+              onClose={() => setRoutePanelOpen(false)}
+            />
+          ) : selectedTile ? (
+            <TileDetailsSheet
+              tile={selectedTile}
+              reports={effectiveState.reports}
+              incident={selectedIncident}
+              onClose={() => setSelectedTileId(null)}
+              onReportHere={(id) => {
+                setSelectedTileId(id);
+                setReportDialogOpen(true);
+              }}
+              onRouteFrom={(id) => {
+                setRouteFromId(id);
+                setRoutePanelOpen(true);
+                if (routeToId) handleCalculateRoute(id, routeToId);
+              }}
+              onRouteTo={(id) => {
+                setRouteToId(id);
+                setRoutePanelOpen(true);
+                if (routeFromId) handleCalculateRoute(routeFromId, id);
+              }}
+              onOpenPreparedness={() => setPrepModalOpen(true)}
+            />
+          ) : (
+            <CorridorOverview
+              tiles={tiles}
+              state={effectiveState}
+              alerts={allAlerts}
+              onSelectZone={handleJumpToZone}
+              onOpenReport={() => setReportDialogOpen(true)}
+              onOpenRoute={() => setRoutePanelOpen(true)}
+              onOpenPreparedness={() => setPrepModalOpen(true)}
+            />
+          )}
+        </aside>
 
-        {/* Floating Map Controls Bar (Top Left) */}
-        <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 max-w-[calc(100%-24px)] pointer-events-auto">
-          {/* Quick Zone Jump Bar */}
-          <div className="flex items-center gap-1 overflow-x-auto py-1 px-1.5 rounded-lg border border-border bg-card/90 backdrop-blur-md shadow-md text-xs no-scrollbar">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase px-1 shrink-0">
-              Corridor:
-            </span>
-            {ZONES.map((z) => (
-              <button
-                type="button"
-                key={z.key}
-                onClick={() => handleJumpToZone(z.key)}
-                className="px-2 py-1 rounded-md text-[11px] font-medium hover:bg-muted text-foreground transition-colors shrink-0"
-              >
-                {z.label}
-              </button>
-            ))}
-          </div>
+        {/* MAP CONTAINER (Fills remaining flex space) */}
+        <main className="flex-1 h-full relative overflow-hidden bg-slate-200 dark:bg-slate-900">
+          <FloodMap
+            tiles={tiles}
+            reports={effectiveState.reports}
+            incidents={effectiveState.incidents}
+            shelters={SHELTERS}
+            alertTileIds={alertTileIds}
+            routePath={routeResult?.path || null}
+            routeFromId={routeFromId}
+            routeToId={routeToId}
+            selectedTileId={selectedTileId}
+            selectedTileIds={selectedTileIds}
+            pulseTileId={pulseTileId}
+            highlightShelterId={highlightShelterId}
+            showPredicted={showPredicted}
+            onlyHighCritical={onlyHighCritical}
+            showReports={showReportsFilter}
+            userPos={userPos}
+            focus={focus}
+            pickMode={pickMode}
+            onTileClick={handleTileClick}
+            onShelterClick={handleShelterClick}
+            onViewportChange={setViewportTileIds}
+          />
 
-          {/* Map Filters & Predictive Toggle */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* 3-Hour Predictive Toggle */}
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border bg-card/90 backdrop-blur-md shadow-md text-xs">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <label
-                htmlFor="pred-toggle"
-                className="text-[11px] font-semibold text-foreground cursor-pointer"
-              >
-                3h Predictive Risk
-              </label>
-              <Switch
-                id="pred-toggle"
-                checked={showPredicted}
-                onCheckedChange={setShowPredicted}
-                className="scale-80"
-              />
+          {/* Floating Map Controls (Top Left of Map Area) */}
+          <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 max-w-[calc(100%-24px)] pointer-events-auto">
+            {/* Quick Corridor Jump Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs no-scrollbar">
+              <span className="text-[11px] font-bold text-slate-400 uppercase shrink-0">Jump:</span>
+              {ZONES.map((z) => (
+                <button
+                  type="button"
+                  key={z.key}
+                  onClick={() => handleJumpToZone(z.key)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors shrink-0"
+                >
+                  {z.label}
+                </button>
+              ))}
             </div>
 
-            {/* Filter: Only High/Critical */}
-            <button
-              type="button"
-              onClick={() => setOnlyHighCritical(!onlyHighCritical)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold shadow-md backdrop-blur-md transition-all ${
-                onlyHighCritical
-                  ? "bg-destructive text-destructive-foreground border-destructive"
-                  : "bg-card/90 text-foreground border-border hover:bg-muted"
-              }`}
-            >
-              <ShieldAlert className="h-3.5 w-3.5" />
-              <span>Severe Only</span>
-            </button>
+            {/* Map Filter Controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 3-Hour Predictive Toggle */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                <label
+                  htmlFor="pred-toggle"
+                  className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+                >
+                  3h Predictive Risk
+                </label>
+                <Switch
+                  id="pred-toggle"
+                  checked={showPredicted}
+                  onCheckedChange={setShowPredicted}
+                  className="scale-90"
+                />
+              </div>
+
+              {/* Filter: Only High/Critical */}
+              <button
+                type="button"
+                onClick={() => setOnlyHighCritical(!onlyHighCritical)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-md backdrop-blur-md transition-all ${
+                  onlyHighCritical
+                    ? "bg-red-600 text-white border-red-600"
+                    : "bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+                }`}
+              >
+                <ShieldAlert className="h-4 w-4" />
+                <span>Severe Only</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Floating Quick Action Buttons (Bottom Left / Center) */}
-        <div className="absolute bottom-4 left-3 z-20 flex items-center gap-2 pointer-events-auto">
-          {/* Report Flooding FAB */}
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => setReportDialogOpen(true)}
-            className="h-11 px-4 rounded-full font-bold shadow-xl gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm animate-in zoom-in-95 duration-150"
-          >
-            <Plus className="h-4 w-4 stroke-[3]" />
-            <span>Report Flooding</span>
-          </Button>
+          {/* Floating Bottom Action Buttons (Bottom Left of Map) */}
+          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 pointer-events-auto">
+            {/* Report Flooding FAB */}
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => setReportDialogOpen(true)}
+              className="h-11 px-4 sm:px-5 rounded-full font-bold shadow-xl gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm"
+            >
+              <Plus className="h-5 w-5 stroke-[2.5]" />
+              <span>Report Flooding</span>
+            </Button>
 
-          {/* Plan Route FAB */}
-          <Button
-            type="button"
-            size="lg"
-            variant="secondary"
-            onClick={() => setRoutePanelOpen(!routePanelOpen)}
-            className="h-11 px-3.5 rounded-full font-bold shadow-xl gap-1.5 text-xs sm:text-sm border border-border bg-card/95 hover:bg-muted"
-          >
-            <Navigation className="h-4 w-4 text-route" />
-            <span className="hidden sm:inline">Safe Route</span>
-          </Button>
+            {/* Plan Route FAB (especially useful on mobile) */}
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                setRoutePanelOpen(!routePanelOpen);
+                setMobileSheetOpen(true);
+              }}
+              className="h-11 px-3.5 sm:px-4 rounded-full font-bold shadow-xl gap-1.5 text-xs sm:text-sm border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 hover:bg-slate-50"
+            >
+              <Navigation className="h-4 w-4 text-indigo-600" />
+              <span className="hidden sm:inline">Safe Route</span>
+            </Button>
 
-          {/* GPS Locate Button */}
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            onClick={handleLocateMe}
-            className="h-11 w-11 rounded-full shadow-xl bg-card/95 border-border hover:bg-muted text-foreground"
-            title="Center on my location"
-          >
-            <LocateFixed className="h-4 w-4" />
-          </Button>
-        </div>
+            {/* GPS Locate Button */}
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={handleLocateMe}
+              className="h-11 w-11 rounded-full shadow-xl bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 hover:bg-slate-50 text-slate-800 dark:text-slate-200"
+              title="Center on my location"
+            >
+              <LocateFixed className="h-5 w-5" />
+            </Button>
+          </div>
 
-        {/* Map Legend (Bottom Right) */}
-        <MapLegend />
+          {/* Map Legend (Bottom Right) */}
+          <MapLegend />
 
-        {/* 4. Tile Details Bottom Sheet / Side Card (Feature 1 & Feature 6) */}
-        {selectedTile && (
-          <TileDetailsSheet
-            tile={selectedTile}
-            reports={effectiveState.reports}
-            incident={selectedIncident}
-            onClose={() => setSelectedTileId(null)}
-            onReportHere={(id) => {
-              setSelectedTileId(id);
-              setReportDialogOpen(true);
-            }}
-            onRouteFrom={(id) => {
-              setRouteFromId(id);
-              setRoutePanelOpen(true);
-              if (routeToId) handleCalculateRoute(id, routeToId);
-            }}
-            onRouteTo={(id) => {
-              setRouteToId(id);
-              setRoutePanelOpen(true);
-              if (routeFromId) handleCalculateRoute(routeFromId, id);
-            }}
-            onOpenPreparedness={() => setPrepModalOpen(true)}
-          />
-        )}
+          {/* MOBILE BOTTOM SHEET (Rendered only on screens < lg when active) */}
+          {mobileSheetOpen && (
+            <div className="lg:hidden absolute inset-x-0 bottom-0 max-h-[75vh] z-30 flex flex-col rounded-t-2xl border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
+              <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 shrink-0" />
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                {mode === "authority" ? (
+                  <AuthorityDashboard
+                    state={effectiveState}
+                    tiles={tiles}
+                    onFocusTile={(id) => {
+                      const t = tiles.find((x) => x.id === id);
+                      if (t) {
+                        setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 17, key: Date.now() });
+                        setSelectedTileId(id);
+                        setSelectedTileIds(new Set([id]));
+                      }
+                      setMobileSheetOpen(false);
+                    }}
+                    onOpenSimulation={() => setSimDrawerOpen(true)}
+                    onClose={() => setMobileSheetOpen(false)}
+                  />
+                ) : routePanelOpen ? (
+                  <RoutePanel
+                    tiles={tiles}
+                    routeResult={routeResult}
+                    fromId={routeFromId}
+                    toId={routeToId}
+                    pickMode={pickMode}
+                    onSelectFrom={setRouteFromId}
+                    onSelectTo={setRouteToId}
+                    onCalculateRoute={handleCalculateRoute}
+                    onClearRoute={() => setRouteResult(null)}
+                    onTogglePickMode={() => setPickMode(!pickMode)}
+                    onClose={() => {
+                      setRoutePanelOpen(false);
+                      setMobileSheetOpen(false);
+                    }}
+                  />
+                ) : selectedTile ? (
+                  <TileDetailsSheet
+                    tile={selectedTile}
+                    reports={effectiveState.reports}
+                    incident={selectedIncident}
+                    onClose={() => {
+                      setSelectedTileId(null);
+                      setMobileSheetOpen(false);
+                    }}
+                    onReportHere={(id) => {
+                      setSelectedTileId(id);
+                      setReportDialogOpen(true);
+                    }}
+                    onRouteFrom={(id) => {
+                      setRouteFromId(id);
+                      setRoutePanelOpen(true);
+                      if (routeToId) handleCalculateRoute(id, routeToId);
+                    }}
+                    onRouteTo={(id) => {
+                      setRouteToId(id);
+                      setRoutePanelOpen(true);
+                      if (routeFromId) handleCalculateRoute(routeFromId, id);
+                    }}
+                    onOpenPreparedness={() => setPrepModalOpen(true)}
+                  />
+                ) : (
+                  <CorridorOverview
+                    tiles={tiles}
+                    state={effectiveState}
+                    alerts={allAlerts}
+                    onSelectZone={(z) => {
+                      handleJumpToZone(z);
+                      setMobileSheetOpen(false);
+                    }}
+                    onOpenReport={() => setReportDialogOpen(true)}
+                    onOpenRoute={() => setRoutePanelOpen(true)}
+                    onOpenPreparedness={() => setPrepModalOpen(true)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
 
-        {/* 5. Safe Route Navigation Panel (Feature 3) */}
-        {routePanelOpen && (
-          <RoutePanel
-            tiles={tiles}
-            routeResult={routeResult}
-            fromId={routeFromId}
-            toId={routeToId}
-            pickMode={pickMode}
-            onSelectFrom={setRouteFromId}
-            onSelectTo={setRouteToId}
-            onCalculateRoute={handleCalculateRoute}
-            onClearRoute={() => setRouteResult(null)}
-            onTogglePickMode={() => setPickMode(!pickMode)}
-            onClose={() => setRoutePanelOpen(false)}
-          />
-        )}
-
-        {/* 6. Municipal Control Room Dashboard (Feature 5) */}
-        {mode === "authority" && (
-          <AuthorityDashboard
-            state={effectiveState}
-            tiles={tiles}
-            onFocusTile={(id) => {
-              const t = tiles.find((x) => x.id === id);
-              if (t) {
-                setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 17, key: Date.now() });
-                setSelectedTileId(id);
-                setSelectedTileIds(new Set([id]));
-              }
-            }}
-            onOpenSimulation={() => setSimDrawerOpen(true)}
-          />
-        )}
-      </main>
-
-      {/* 7. Crowdsourced Photo & Report Submission Dialog (Feature 2) */}
+      {/* 4. MODALS & DRAWERS (All portalled to document.body with z-[10000]) */}
       <ReportDialog
         open={reportDialogOpen}
         preselectedTileId={selectedTileId}
@@ -400,7 +512,6 @@ function StreetFloodApp() {
         }}
       />
 
-      {/* 8. Targeted Alert Notifications Drawer (Feature 4) */}
       <AlertsDrawer
         open={alertsDrawerOpen}
         alerts={allAlerts}
@@ -420,7 +531,6 @@ function StreetFloodApp() {
         onOpenPreparedness={() => setPrepModalOpen(true)}
       />
 
-      {/* 9. Emergency Preparedness & Evacuation Assistance Modal (Feature 7) */}
       <PreparednessModal
         open={prepModalOpen}
         state={effectiveState}
@@ -435,7 +545,6 @@ function StreetFloodApp() {
         }}
       />
 
-      {/* 10. Simulation Sandbox Drawer */}
       <SimulationDrawer
         open={simDrawerOpen}
         state={effectiveState}

@@ -28,28 +28,24 @@ export interface FloodMapProps {
   onViewportChange?: (ids: Set<string>) => void;
 }
 
-function cssVar(name: string) {
-  if (typeof window === "undefined") return "#000000";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#000000";
-}
-
-const RISK_VAR: Record<RiskLevel, string> = {
-  Low: "--risk-low",
-  Moderate: "--risk-moderate",
-  High: "--risk-high",
-  Critical: "--risk-critical",
+const RISK_HEX: Record<RiskLevel, string> = {
+  Low: "#10b981",
+  Moderate: "#f59e0b",
+  High: "#f97316",
+  Critical: "#ef4444",
 };
 
 export default function FloodMap(props: FloodMapProps) {
   const el = useRef<HTMLDivElement>(null);
   const [L, setL] = useState<typeof LType | null>(null);
+  const [currentZoom, setCurrentZoom] = useState(15);
   const map = useRef<LType.Map | null>(null);
   const rects = useRef(new Map<string, LType.Rectangle>());
   const layers = useRef<Record<string, LType.LayerGroup>>({});
   const propsRef = useRef(props);
   propsRef.current = props;
 
-  // Load Leaflet on client-side only
+  // Load Leaflet dynamically on client-side
   useEffect(() => {
     if (typeof window === "undefined") return;
     import("leaflet").then((mod) => {
@@ -63,24 +59,26 @@ export default function FloodMap(props: FloodMapProps) {
     const m = L.map(el.current, {
       center: MAP_CENTER,
       zoom: 15,
-      minZoom: 13,
+      minZoom: 12,
       maxZoom: 19,
       zoomControl: false,
-      preferCanvas: false,
+      preferCanvas: true,
     });
+
     L.control.zoom({ position: "bottomright" }).addTo(m);
+
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
     }).addTo(m);
 
     const s = GRID.south;
     const w = GRID.west;
     m.setMaxBounds(
       L.latLngBounds(
-        [s - 0.02, w - 0.02],
-        [s + GRID.rows * GRID.dLat + 0.02, w + GRID.cols * GRID.dLng + 0.02],
+        [s - 0.04, w - 0.04],
+        [s + GRID.rows * GRID.dLat + 0.04, w + GRID.cols * GRID.dLng + 0.04],
       ),
     );
 
@@ -93,6 +91,10 @@ export default function FloodMap(props: FloodMapProps) {
       if (id) {
         propsRef.current.onTileClick(id, e.latlng.lat, e.latlng.lng);
       }
+    });
+
+    m.on("zoomend", () => {
+      setCurrentZoom(m.getZoom());
     });
 
     const emitViewport = () => {
@@ -110,9 +112,11 @@ export default function FloodMap(props: FloodMapProps) {
     setTimeout(() => {
       m.invalidateSize();
       emitViewport();
-    }, 50);
+    }, 100);
 
-    const ro = new ResizeObserver(() => m.invalidateSize());
+    const ro = new ResizeObserver(() => {
+      m.invalidateSize();
+    });
     ro.observe(el.current);
 
     const currentRects = rects.current;
@@ -124,62 +128,72 @@ export default function FloodMap(props: FloodMapProps) {
     };
   }, [L]);
 
-  // Tiles grid overlay
+  // Tiles grid overlay with Level-of-Detail zoom scaling
   useEffect(() => {
     if (!L || !map.current) return;
     const m = map.current;
-    const amber = cssVar("--risk-moderate") || "#f59e0b";
-    const green = cssVar("--risk-low") || "#10b981";
-    const sel = cssVar("--primary") || "#2563eb";
+    const isCityZoom = currentZoom < 14;
 
     for (const t of props.tiles) {
       let r = rects.current.get(t.id);
       if (!r) {
-        r = L.rectangle(tileBounds(t.row, t.col), { interactive: false, weight: 1 }).addTo(m);
+        r = L.rectangle(tileBounds(t.row, t.col), { interactive: true }).addTo(m);
+        r.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
+          propsRef.current.onTileClick(t.id, t.centerLat, t.centerLng);
+        });
         rects.current.set(t.id, r);
       }
-      const color = cssVar(RISK_VAR[t.currentRiskLevel]);
-      const dim =
+
+      const color = RISK_HEX[t.currentRiskLevel];
+      const isDimmed =
         props.onlyHighCritical &&
         (t.currentRiskLevel === "Low" || t.currentRiskLevel === "Moderate");
-      const isSel = props.selectedTileId === t.id || props.selectedTileIds?.has(t.id);
-      const baseOpacity =
-        t.currentRiskLevel === "Low" ? 0.14 : t.currentRiskLevel === "Moderate" ? 0.4 : 0.55;
+      const isSelected = props.selectedTileId === t.id || props.selectedTileIds?.has(t.id);
 
-      let stroke = color;
-      let weight = 0.5;
-      let dash: string | undefined;
-      let strokeOpacity = 0.35;
+      // Clean, readable opacity levels
+      let baseOpacity = 0.08;
+      if (t.currentRiskLevel === "Moderate") baseOpacity = 0.28;
+      if (t.currentRiskLevel === "High") baseOpacity = 0.45;
+      if (t.currentRiskLevel === "Critical") baseOpacity = 0.65;
 
-      if (props.showPredicted) {
-        if (t.predictedRisk === "Moderate") {
-          stroke = amber;
-          weight = 2.5;
-          dash = "4 3";
-          strokeOpacity = 1;
-        } else {
-          stroke = green;
-          weight = 1;
-          strokeOpacity = 0.7;
-        }
+      let strokeColor = color;
+      let strokeWeight = isCityZoom ? 0 : 0.6;
+      let strokeOpacity = isCityZoom ? 0 : 0.25;
+      let dashArray: string | undefined = undefined;
+
+      // 3h Predicted overlay: Only Moderate predicted gets an amber dashed outline
+      if (
+        props.showPredicted &&
+        t.predictedRisk === "Moderate" &&
+        t.currentRiskLevel !== "Critical"
+      ) {
+        strokeColor = "#f59e0b";
+        strokeWeight = 2;
+        strokeOpacity = 0.9;
+        dashArray = "4 3";
       }
-      if (isSel) {
-        stroke = sel;
-        weight = 3.5;
-        dash = undefined;
+
+      // Selected tile outline
+      if (isSelected) {
+        strokeColor = "#0284c7";
+        strokeWeight = 3;
         strokeOpacity = 1;
+        dashArray = undefined;
       }
 
       r.setStyle({
-        color: stroke,
-        weight,
-        opacity: dim ? 0.08 : strokeOpacity,
-        dashArray: dash,
+        color: strokeColor,
+        weight: strokeWeight,
+        opacity: isDimmed ? 0.05 : strokeOpacity,
+        dashArray: dashArray,
         fillColor: color,
-        fillOpacity: dim ? 0.02 : baseOpacity,
+        fillOpacity: isDimmed ? 0.02 : baseOpacity,
       });
 
-      if (isSel) r.bringToFront();
+      if (isSelected) {
+        r.bringToFront();
+      }
     }
   }, [
     L,
@@ -188,24 +202,26 @@ export default function FloodMap(props: FloodMapProps) {
     props.selectedTileIds,
     props.showPredicted,
     props.onlyHighCritical,
+    currentZoom,
   ]);
 
-  // Road closures overlay
+  // Road closures overlay (Dashed red box + hazard pin)
   useEffect(() => {
     if (!L) return;
     const g = layers.current.incidents;
     if (!g) return;
     g.clearLayers();
-    const crit = cssVar("--risk-critical") || "#ef4444";
 
     for (const i of props.incidents) {
       const [row, col] = i.tileId.slice(2).split("_").map(Number);
       const b = tileBounds(row, col);
+
       L.rectangle(b, {
         interactive: false,
-        color: crit,
-        weight: 3,
-        fillOpacity: 0.1,
+        color: "#dc2626",
+        weight: 2.5,
+        fillColor: "#dc2626",
+        fillOpacity: 0.15,
         className: "sf-closure",
       }).addTo(g);
 
@@ -213,11 +229,12 @@ export default function FloodMap(props: FloodMapProps) {
         i.status === "ClosedAllTraffic" ? "⛔" : i.status === "ClosedSmallVehicles" ? "🚫" : "⚠️";
       const marker = L.marker([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2], {
         interactive: true,
+        zIndexOffset: 500,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-closure-pin cursor-pointer hover:scale-110 transition-transform" title="${i.description}">${label}</span>`,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
+          html: `<span class="sf-closure-pin cursor-pointer hover:scale-110 transition-transform" title="Road Incident: ${i.description}">${label}</span>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
         }),
       }).addTo(g);
 
@@ -228,28 +245,33 @@ export default function FloodMap(props: FloodMapProps) {
     }
   }, [L, props.incidents]);
 
-  // Alert badges
+  // Alert badges: ONLY rendered for specific official targeted alerts, NOT all 576 tiles!
   useEffect(() => {
     if (!L) return;
     const g = layers.current.badges;
     if (!g) return;
     g.clearLayers();
+
+    // At city zoom, avoid cluttering
+    if (currentZoom < 13) return;
+
     for (const t of props.tiles) {
       if (!props.alertTileIds.has(t.id)) continue;
       const [[s], [n, e]] = tileBounds(t.row, t.col);
-      L.marker([n - (n - s) * 0.18, e - GRID.dLng * 0.18], {
+      L.marker([n - (n - s) * 0.22, e - GRID.dLng * 0.22], {
         interactive: false,
+        zIndexOffset: 400,
         icon: L.divIcon({
           className: "sf-icon",
           html: `<span class="sf-badge animate-pulse" title="Active Municipal Alert on this block">!</span>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
         }),
       }).addTo(g);
     }
-  }, [L, props.tiles, props.alertTileIds]);
+  }, [L, props.tiles, props.alertTileIds, currentZoom]);
 
-  // Reports markers
+  // Crowdsourced Report markers
   useEffect(() => {
     if (!L) return;
     const g = layers.current.reports;
@@ -261,8 +283,10 @@ export default function FloodMap(props: FloodMapProps) {
     for (const r of props.reports) {
       if (r.status === "Dismissed") continue;
       if (mode === "unverified" && r.status !== "Unverified") continue;
+
       const marker = L.marker([r.lat, r.lng], {
         interactive: true,
+        zIndexOffset: 300,
         icon: L.divIcon({
           className: "sf-icon",
           html: `<span class="sf-report cursor-pointer hover:scale-125 transition-transform ${r.status === "Verified" ? "is-verified" : ""}" title="${r.status}: ${r.description}"></span>`,
@@ -278,22 +302,23 @@ export default function FloodMap(props: FloodMapProps) {
     }
   }, [L, props.reports, props.showReports]);
 
-  // Shelters markers
+  // Relief Shelters markers
   useEffect(() => {
     if (!L) return;
     const g = layers.current.shelters;
     if (!g) return;
     g.clearLayers();
+
     for (const s of props.shelters) {
-      const hl = props.highlightShelterId === s.id;
+      const isHighlighted = props.highlightShelterId === s.id;
       const marker = L.marker([s.lat, s.lng], {
         interactive: true,
-        zIndexOffset: hl ? 1000 : 100,
+        zIndexOffset: isHighlighted ? 1200 : 250,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-shelter cursor-pointer hover:scale-110 transition-transform ${hl ? "is-hl" : ""}" title="${s.name} (${s.capacityStatus})">⌂</span>`,
-          iconSize: hl ? [36, 36] : [26, 26],
-          iconAnchor: hl ? [18, 18] : [13, 13],
+          html: `<span class="sf-shelter cursor-pointer hover:scale-110 transition-transform ${isHighlighted ? "is-hl" : ""}" title="${s.name} (${s.capacityStatus})">⌂</span>`,
+          iconSize: isHighlighted ? [38, 38] : [28, 28],
+          iconAnchor: isHighlighted ? [19, 19] : [14, 14],
         }),
       }).addTo(g);
 
@@ -302,6 +327,7 @@ export default function FloodMap(props: FloodMapProps) {
         propsRef.current.onShelterClick?.(s.id);
       });
     }
+
     if (props.highlightShelterId) {
       const s = props.shelters.find((x) => x.id === props.highlightShelterId);
       if (s) map.current?.flyTo([s.lat, s.lng], 17, { duration: 0.6 });
@@ -314,19 +340,17 @@ export default function FloodMap(props: FloodMapProps) {
     const g = layers.current.route;
     if (!g) return;
     g.clearLayers();
-    const prim = cssVar("--route") || "#6366f1";
-    const bg = cssVar("--background") || "#ffffff";
 
-    const pin = (id: string | null | undefined, txt: string, color: string) => {
+    const pin = (id: string | null | undefined, text: string, color: string) => {
       if (!id) return;
       const t = props.tiles.find((x) => x.id === id);
       if (!t) return;
       L.marker([t.centerLat, t.centerLng], {
         interactive: false,
-        zIndexOffset: 2000,
+        zIndexOffset: 1500,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-route-pin" style="background:${color}">${txt}</span>`,
+          html: `<span class="sf-route-pin" style="background:${color}">${text}</span>`,
           iconSize: [28, 28],
           iconAnchor: [14, 14],
         }),
@@ -335,29 +359,29 @@ export default function FloodMap(props: FloodMapProps) {
 
     if (props.routePath?.length) {
       const pts = props.routePath.map((t) => [t.centerLat, t.centerLng] as [number, number]);
-      // Casing line
+      // Outline shadow
       L.polyline(pts, {
-        color: bg,
-        weight: 9,
+        color: "#ffffff",
+        weight: 8,
         opacity: 0.9,
         interactive: false,
       }).addTo(g);
       // Main polyline
       L.polyline(pts, {
-        color: prim,
+        color: "#6366f1",
         weight: 5,
         opacity: 1,
         interactive: false,
       }).addTo(g);
 
-      map.current?.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 17 });
+      map.current?.fitBounds(L.latLngBounds(pts).pad(0.2), { maxZoom: 17 });
     }
 
     pin(props.routeFromId, "A", "#10b981");
     pin(props.routeToId, "B", "#6366f1");
   }, [L, props.routePath, props.routeFromId, props.routeToId, props.tiles]);
 
-  // User position
+  // User position marker
   useEffect(() => {
     if (!L) return;
     const g = layers.current.user;
@@ -366,7 +390,7 @@ export default function FloodMap(props: FloodMapProps) {
     if (props.userPos) {
       L.marker(props.userPos, {
         interactive: false,
-        zIndexOffset: 1500,
+        zIndexOffset: 1100,
         icon: L.divIcon({
           className: "sf-icon",
           html: `<span class="sf-user" title="Your Location"></span>`,
@@ -377,7 +401,7 @@ export default function FloodMap(props: FloodMapProps) {
     }
   }, [L, props.userPos]);
 
-  // Pulse on new report
+  // Pulse wave animation on new report
   useEffect(() => {
     if (!L) return;
     const g = layers.current.pulse;
@@ -385,9 +409,10 @@ export default function FloodMap(props: FloodMapProps) {
     g.clearLayers();
     const t = props.tiles.find((x) => x.id === props.pulseTileId);
     if (!t) return;
+
     L.marker([t.centerLat, t.centerLng], {
       interactive: false,
-      zIndexOffset: 3000,
+      zIndexOffset: 1600,
       icon: L.divIcon({
         className: "sf-icon",
         html: `<span class="sf-pulse"></span>`,
@@ -395,6 +420,7 @@ export default function FloodMap(props: FloodMapProps) {
         iconAnchor: [30, 30],
       }),
     }).addTo(g);
+
     const timer = setTimeout(() => g.clearLayers(), 3500);
     return () => clearTimeout(timer);
   }, [L, props.pulseTileId, props.tiles]);
@@ -402,14 +428,14 @@ export default function FloodMap(props: FloodMapProps) {
   // Focus flyTo
   useEffect(() => {
     if (props.focus && map.current) {
-      map.current.flyTo([props.focus.lat, props.focus.lng], props.focus.zoom ?? 17, {
+      map.current.flyTo([props.focus.lat, props.focus.lng], props.focus.zoom ?? 16, {
         duration: 0.6,
       });
     }
   }, [props.focus]);
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full overflow-hidden">
       <div
         ref={el}
         className={`h-full w-full ${props.pickMode ? "sf-picking" : ""}`}
@@ -417,10 +443,10 @@ export default function FloodMap(props: FloodMapProps) {
         aria-label="StreetFlood Live interactive flood severity map. Click any tile to inspect street level risk."
       />
       {!L && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-xs gap-3">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 gap-3 z-30">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm font-medium text-muted-foreground font-sans">
-            Initializing StreetFlood Live map grid...
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            Initializing street-level map grid...
           </p>
         </div>
       )}
