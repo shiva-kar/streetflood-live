@@ -108,7 +108,8 @@
   --verified: oklch(0.5 0.13 160);
   --simulated: oklch(0.93 0.07 300);
   --simulated-foreground: oklch(0.35 0.12 300);
-  --shadow-float-v: 0 12px 32px -12px oklch(0.2 0.05 240 / 0.35), 0 2px 6px -2px oklch(0.2 0.05 240 / 0.15);
+  --shadow-float-v:
+    0 12px 32px -12px oklch(0.2 0.05 240 / 0.35), 0 2px 6px -2px oklch(0.2 0.05 240 / 0.15);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -171,21 +172,122 @@
 }
 
 @layer base {
-  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.01em; }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
 }
 
-.leaflet-container { font-family: var(--font-sans); background: var(--muted); }
-.sf-picking, .sf-picking .leaflet-container { cursor: crosshair !important; }
-.sf-icon { background: transparent; border: 0; }
-.sf-badge { display:grid; place-items:center; width:14px; height:14px; border-radius:999px; background: var(--ink); color: var(--ink-foreground); font: 700 10px/1 var(--font-sans); box-shadow: 0 0 0 2px var(--background); }
-.sf-report { display:block; width:14px; height:14px; border-radius:999px; background: var(--background); border: 3px solid var(--risk-high); box-shadow: 0 1px 3px oklch(0 0 0 / .35); }
-.sf-report.is-verified { border-color: var(--verified); background: var(--verified); }
-.sf-shelter { display:grid; place-items:center; width:100%; height:100%; border-radius:8px; background: var(--verified); color: var(--primary-foreground); font: 700 16px/1 var(--font-sans); box-shadow: 0 0 0 2px var(--background), 0 2px 6px oklch(0 0 0 / .3); }
-.sf-shelter.is-hl { animation: sf-bounce 1s ease-in-out 3; font-size: 22px; }
-.sf-closure-pin { display:grid; place-items:center; width:26px; height:26px; border-radius:999px; background: var(--background); box-shadow: 0 0 0 2px var(--risk-critical); font-size:14px; }
-.sf-closure { stroke-dasharray: 6 4; }
-.sf-route-pin { display:grid; place-items:center; width:26px; height:26px; border-radius:999px; background: var(--route); color: var(--primary-foreground); font: 700 13px/1 var(--font-display); box-shadow: 0 0 0 3px var(--background); }
-.sf-user { display:block; width:18px; height:18px; border-radius:999px; background: var(--route); box-shadow: 0 0 0 4px color-mix(in oklab, var(--route) 30%, transparent), 0 0 0 2px var(--background) inset; }
-.sf-pulse { display:block; width:60px; height:60px; border-radius:999px; border: 3px solid var(--primary); animation: sf-pulse 1s ease-out 3; }
-@keyframes sf-pulse { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
-@keyframes sf-bounce { 50% { transform: translateY(-6px); } }
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: var(--muted);
+}
+.sf-picking,
+.sf-picking .leaflet-container {
+  cursor: crosshair !important;
+}
+.sf-icon {
+  background: transparent;
+  border: 0;
+}
+.sf-badge {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ink-foreground);
+  font: 700 10px/1 var(--font-sans);
+  box-shadow: 0 0 0 2px var(--background);
+}
+.sf-report {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--background);
+  border: 3px solid var(--risk-high);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.35);
+}
+.sf-report.is-verified {
+  border-color: var(--verified);
+  background: var(--verified);
+}
+.sf-shelter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--verified);
+  color: var(--primary-foreground);
+  font: 700 16px/1 var(--font-sans);
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 2px 6px oklch(0 0 0 / 0.3);
+}
+.sf-shelter.is-hl {
+  animation: sf-bounce 1s ease-in-out 3;
+  font-size: 22px;
+}
+.sf-closure-pin {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--background);
+  box-shadow: 0 0 0 2px var(--risk-critical);
+  font-size: 14px;
+}
+.sf-closure {
+  stroke-dasharray: 6 4;
+}
+.sf-route-pin {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--route);
+  color: var(--primary-foreground);
+  font: 700 13px/1 var(--font-display);
+  box-shadow: 0 0 0 3px var(--background);
+}
+.sf-user {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--route);
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--route) 30%, transparent),
+    0 0 0 2px var(--background) inset;
+}
+.sf-pulse {
+  display: block;
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  border: 3px solid var(--primary);
+  animation: sf-pulse 1s ease-out 3;
+}
+@keyframes sf-pulse {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+@keyframes sf-bounce {
+  50% {
+    transform: translateY(-6px);
+  }
+}
