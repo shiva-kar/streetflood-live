@@ -32,6 +32,7 @@ import {
 } from "@/lib/supabase/client";
 import { useAppState, getState, setState } from "@/lib/flood/store";
 import { MAP_CENTER, SHELTERS as INITIAL_SHELTERS } from "@/lib/flood/data";
+import { findNearestKnownShelters, getHaversineDistanceKm, formatDistanceString } from "@/lib/flood/sheltersDatabase";
 import type { FloodAlert, FloodReport, RoadIncident, Shelter, Tile } from "@/lib/flood/types";
 import { toast } from "sonner";
 
@@ -225,20 +226,43 @@ export default function StreetFloodApp() {
     return dynamicTiles.find((t) => t.id === userCellId) || dynamicTiles[0] || null;
   }, [selectedTileId, dynamicTiles, userPos]);
 
-  // Nearest Shelter Calculation
+  // Contextual Reference Coordinate:
+  // If user actively navigated or panned away (>25km) to another city (e.g. Assam, Delhi),
+  // prioritize the active map center so nearest shelters and status reflect what they are viewing.
+  // Otherwise prioritize their live GPS coordinate.
+  const referenceCoord = useMemo<[number, number]>(() => {
+    const cLat = viewportBounds.centerLat;
+    const cLng = viewportBounds.centerLng;
+    const distToGps = getHaversineDistanceKm(userPos[0], userPos[1], cLat, cLng);
+    if (distToGps < 25) {
+      return userPos;
+    }
+    return [cLat, cLng];
+  }, [userPos, viewportBounds]);
+
+  // Nearest Shelter Calculation using Haversine Geodesic Distance
   const nearestShelter = useMemo(() => {
-    if (shelters.length === 0) return null;
+    const [refLat, refLng] = referenceCoord;
+    const dbCandidates = findNearestKnownShelters(refLat, refLng, 6);
+    const osmCandidates = shelters.filter((s) => s.id.startsWith("osm_sh_"));
+    const pool = [...osmCandidates, ...dbCandidates];
+    if (pool.length === 0) return null;
+
     let minD = Infinity;
-    let best: Shelter | null = null;
-    for (const s of shelters) {
-      const d = Math.hypot(s.lat - userPos[0], s.lng - userPos[1]);
+    let best: (Shelter & { distanceKm?: number; distanceLabel?: string }) | null = null;
+    for (const s of pool) {
+      const d = getHaversineDistanceKm(refLat, refLng, s.lat, s.lng);
       if (d < minD) {
         minD = d;
-        best = s;
+        best = {
+          ...s,
+          distanceKm: d,
+          distanceLabel: formatDistanceString(d),
+        };
       }
     }
     return best;
-  }, [shelters, userPos]);
+  }, [referenceCoord, shelters]);
 
   // Handlers
   const handleLocateUser = async () => {
@@ -258,7 +282,16 @@ export default function StreetFloodApp() {
 
   const handleSelectPlace = (lat: number, lng: number, name: string) => {
     setFocus({ lat, lng, zoom: 15, key: Date.now() });
-    toast.info(`Jumped to ${name}`);
+    setViewportBounds((prev) => ({
+      ...prev,
+      centerLat: lat,
+      centerLng: lng,
+      south: lat - 0.03,
+      north: lat + 0.03,
+      west: lng - 0.03,
+      east: lng + 0.03,
+    }));
+    toast.info(`Viewing ${name}`);
   };
 
   const handlePlanRouteToShelter = async (shelter: Shelter) => {
@@ -269,7 +302,7 @@ export default function StreetFloodApp() {
       description: i.description,
     }));
 
-    const result = await calculateWorldwideSafeRoute(userPos, [shelter.lat, shelter.lng], blocked);
+    const result = await calculateWorldwideSafeRoute(referenceCoord, [shelter.lat, shelter.lng], blocked);
     toast.dismiss("routing");
     if (result) {
       setRoadRoute(result);

@@ -21,7 +21,14 @@ export default function BottomNav({
   const t = useI18n();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t shadow-lg px-4 py-2 flex items-center justify-around max-w-md mx-auto sm:rounded-t-2xl sm:mb-2 sm:border sm:border-b">
+    <nav
+      className="fixed z-40 bg-background/95 backdrop-blur-xl shadow-xl transition-all
+        /* Mobile: Flush to bottom bezel, 100% full width, zero exposed map gaps */
+        left-0 right-0 bottom-0 w-full border-t border-border px-4 py-2 flex items-center justify-around pb-[max(0.5rem,env(safe-area-inset-bottom))]
+        /* Desktop: Standalone centered floating pill with rounded borders and no card behind it */
+        sm:left-1/2 sm:right-auto sm:bottom-6 sm:-translate-x-1/2 sm:w-auto sm:rounded-2xl sm:border sm:border-border sm:px-6 sm:py-2.5 sm:gap-6
+      "
+    >
       {/* 1. MAP TAB */}
       <button
         type="button"

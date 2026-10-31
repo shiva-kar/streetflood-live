@@ -73,63 +73,7 @@ export function buildTiles(): TileBase[] {
   return out;
 }
 
-export const SHELTERS: Shelter[] = [
-  {
-    id: "sh1",
-    name: "Demo Shelter A – Municipal School",
-    address: "Sion East / SIES College Area (simulated)",
-    lat: 19.0455,
-    lng: 72.8655,
-    kind: "School",
-    capacityStatus: "Space available",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Ground-floor ramp access; emergency medical desk (simulated)",
-  },
-  {
-    id: "sh2",
-    name: "Demo Shelter B – Community Hall",
-    address: "Chunabhatti East (simulated)",
-    lat: 19.0478,
-    lng: 72.879,
-    kind: "Community Hall",
-    capacityStatus: "Filling up",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Elevated community hall; food and dry relief point (simulated)",
-  },
-  {
-    id: "sh3",
-    name: "Demo Shelter C – Ward Office Annexe",
-    address: "Kurla West, off LBS Marg (simulated)",
-    lat: 19.0585,
-    lng: 72.8745,
-    kind: "Municipal Building",
-    capacityStatus: "Space available",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Municipal administration building; high elevation (simulated)",
-  },
-  {
-    id: "sh4",
-    name: "Demo Shelter D – Secondary School",
-    address: "Kurla West / CST Road corridor (simulated)",
-    lat: 19.0565,
-    lng: 72.8715,
-    kind: "School",
-    capacityStatus: "Near capacity",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Multi-story education complex; emergency bedding (simulated)",
-  },
-  {
-    id: "sh5",
-    name: "Demo Shelter E – Community Centre",
-    address: "Sion–Kurla link road (simulated)",
-    lat: 19.0515,
-    lng: 72.8712,
-    kind: "Community Hall",
-    capacityStatus: "Space available",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Direct access from elevated link road corridor (simulated)",
-  },
-];
+export { COMPREHENSIVE_SHELTERS as SHELTERS } from "./sheltersDatabase";
 
 export interface StaticRoadCorridor {
   id: string;

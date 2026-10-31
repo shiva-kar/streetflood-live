@@ -536,36 +536,41 @@ export async function findBestShelterEvacuation(
   recommended: ShelterCandidate | null;
   candidates: ShelterCandidate[];
 }> {
-  const candidates: ShelterCandidate[] = [];
+  // Focus on top closest candidate shelters (up to 8) to optimize evacuation route planning
+  const candidatePool = [...shelters]
+    .sort((a, b) => distanceKm(origin.lat, origin.lng, a.lat, a.lng) - distanceKm(origin.lat, origin.lng, b.lat, b.lng))
+    .slice(0, 8);
 
-  for (const shelter of shelters) {
-    const route = await calculateRoadRoute(
-      origin,
-      { lat: shelter.lat, lng: shelter.lng },
-      tiles,
-      reports,
-      incidents,
-    );
+  const candidates: ShelterCandidate[] = await Promise.all(
+    candidatePool.map(async (shelter) => {
+      const route = await calculateRoadRoute(
+        origin,
+        { lat: shelter.lat, lng: shelter.lng },
+        tiles,
+        reports,
+        incidents,
+      );
 
-    let isEligible = true;
-    let rejectionReason: string | undefined;
+      let isEligible = true;
+      let rejectionReason: string | undefined;
 
-    if (route.safetyStatus === "Impassable") {
-      isEligible = false;
-      rejectionReason = route.blockedByClosure
-        ? `Road closure along path (${route.blockedByClosure.description})`
-        : "Impassable critical flood hazard on access road";
-    }
+      if (route.safetyStatus === "Impassable") {
+        isEligible = false;
+        rejectionReason = route.blockedByClosure
+          ? `Road closure along path (${route.blockedByClosure.description})`
+          : "Impassable critical flood hazard on access road";
+      }
 
-    candidates.push({
-      shelter,
-      route,
-      isRecommended: false,
-      rejectionReason,
-      roadDistanceKm: route.distanceKm,
-      roadDurationMinutes: route.durationMinutes,
-    });
-  }
+      return {
+        shelter,
+        route,
+        isRecommended: false,
+        rejectionReason,
+        roadDistanceKm: route.distanceKm,
+        roadDurationMinutes: route.durationMinutes,
+      };
+    }),
+  );
 
   // Sort candidates:
   // 1. Eligible (not impassable) first

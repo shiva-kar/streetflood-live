@@ -97,7 +97,7 @@ describe("Road-Based Evacuation Routing Engine", () => {
       state.incidents,
     );
 
-    expect(candidates.length).toBe(SHELTERS.length);
+    expect(candidates.length).toBe(Math.min(SHELTERS.length, 8));
     expect(recommended).toBeDefined();
 
     // Recommended shelter must have an acceptable safe or caution route, NOT impassable
