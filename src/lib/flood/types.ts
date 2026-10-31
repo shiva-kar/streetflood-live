@@ -58,6 +58,8 @@ export interface RoadIncident {
   tileId: string;
   status: IncidentStatus;
   description: string;
+  lat?: number;
+  lng?: number;
   photoUrl?: string;
   createdAt: string;
   updatedAt: string;
