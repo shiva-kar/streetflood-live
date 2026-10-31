@@ -1,4 +1,5 @@
 import type { RoadRouteResult, RoadRouteStep, Shelter } from "./types";
+import { assertZeroCostUrl } from "../guards/zeroCostGuard";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
 const OPEN_METEO_BASE = "https://api.open-meteo.com/v1/forecast";
@@ -8,6 +9,13 @@ const OVERPASS_ENDPOINTS = [
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ];
 const OSRM_BASE = "https://router.project-osrm.org/route/v1/driving";
+
+// Statically verify all configured endpoints conform to $0 zero-cost rules
+assertZeroCostUrl(NOMINATIM_BASE);
+assertZeroCostUrl(OPEN_METEO_BASE);
+assertZeroCostUrl(OPEN_METEO_ELEVATION);
+OVERPASS_ENDPOINTS.forEach((ep) => assertZeroCostUrl(ep));
+assertZeroCostUrl(OSRM_BASE);
 
 // ---------------------------------------------------------------------------
 // CACHING

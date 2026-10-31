@@ -1,5 +1,11 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { FloodAlert, FloodReport, RoadIncident, Shelter, WaterDepth } from "../flood/types";
+import {
+  assertPhotoWithinFreeQuota,
+  assertZeroCostUrl,
+  checkCitizenRateLimit,
+  recordCitizenSubmission,
+} from "../guards/zeroCostGuard";
 
 // Check environment variables or user-configured browser keys
 const ENV_URL = import.meta.env.VITE_SUPABASE_URL || "";
@@ -44,6 +50,9 @@ export function getSupabase(): SupabaseClient | null {
     return null;
   }
   try {
+    // Structural zero-cost assert: ensure URL is an authentic Supabase free-tier project
+    assertZeroCostUrl(url);
+
     clientInstance = createClient(url, key, {
       auth: {
         persistSession: true,
@@ -244,6 +253,19 @@ export async function submitLiveReport(report: {
   description: string;
   photoDataUrl?: string;
 }): Promise<FloodReport | null> {
+  // 1. Zero-cost rate limit guard
+  const rate = checkCitizenRateLimit();
+  if (!rate.allowed) {
+    throw new Error(
+      `Rate limit exceeded: max 5 reports per hour to protect free civic infrastructure. Please wait ${rate.resetMinutes} minutes.`,
+    );
+  }
+
+  // 2. Storage quota guard (limit compressed photo bytes)
+  if (report.photoDataUrl) {
+    assertPhotoWithinFreeQuota(report.photoDataUrl);
+  }
+
   const sb = getSupabase();
   let uploadedPhotoUrl = report.photoDataUrl;
 
@@ -279,6 +301,7 @@ export async function submitLiveReport(report: {
       createdAt: new Date().toISOString(),
     };
     await queueOfflineReport(offlineRep);
+    recordCitizenSubmission();
     return {
       id: localId,
       tileId: `t_${Math.floor(report.lat / 0.001)}_${Math.floor(report.lng / 0.001)}`,
@@ -309,6 +332,8 @@ export async function submitLiveReport(report: {
   if (error || !data) {
     throw new Error(error?.message || "Failed to submit report");
   }
+
+  recordCitizenSubmission();
 
   return {
     id: data.id,

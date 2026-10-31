@@ -135,9 +135,10 @@ export default function AuthModal({
         </DialogHeader>
 
         <Tabs defaultValue={currentUser ? "account" : "signin"} className="w-full mt-2">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Sign In / Account</TabsTrigger>
-            <TabsTrigger value="supabase">Free Supabase ($0)</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="signin" className="text-xs">Sign In</TabsTrigger>
+            <TabsTrigger value="supabase" className="text-xs">Free Cloud ($0)</TabsTrigger>
+            <TabsTrigger value="guards" className="text-xs">Zero-Cost Guards</TabsTrigger>
           </TabsList>
 
           {/* SIGN IN TAB */}
@@ -304,6 +305,61 @@ export default function AuthModal({
                 <p>1. Go to supabase.com and create a free project.</p>
                 <p>2. In SQL Editor, run `supabase/migrations/20261101_init_streetflood.sql`.</p>
                 <p>3. Copy Project URL and `anon` key from Project Settings → API.</p>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ZERO-COST ARCHITECTURAL GUARDS TAB */}
+          <TabsContent value="guards" className="space-y-3 pt-3 text-xs">
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 dark:text-emerald-200 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-sm text-emerald-800 dark:text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Guaranteed $0.00 / month Operating Cost
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Structural code guards prevent any accidental spending, paid API calls, or database quota breaches.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
+                <span className="text-base shrink-0">🛡️</span>
+                <div>
+                  <p className="font-semibold text-foreground text-[11px]">Domain Whitelist Firewall</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    All outbound requests are restricted strictly to free open datasets (OpenStreetMap, Open-Meteo, OSRM). Any call to paid map services or payment gateways is blocked at the code level.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
+                <span className="text-base shrink-0">💾</span>
+                <div>
+                  <p className="font-semibold text-foreground text-[11px]">Storage Quota Compression Guard</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Citizen upload photos are compressed in-browser to ≤350 KB before transmission, ensuring media never overflows the free 1 GB storage bucket.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
+                <span className="text-base shrink-0">⚡</span>
+                <div>
+                  <p className="font-semibold text-foreground text-[11px]">Fair-Use Rate Limiter</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Rate limits submissions to max 5 reports per hour per citizen. Prevents spam and protects the 500 MB free database quota.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
+                <span className="text-base shrink-0">🔄</span>
+                <div>
+                  <p className="font-semibold text-foreground text-[11px]">Automated 6-Hour Report Purge</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Reports auto-expire after 6 hours and are pruned from active calculation so storage never bloats over time.
+                  </p>
+                </div>
               </div>
             </div>
           </TabsContent>
