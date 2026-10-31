@@ -102,6 +102,12 @@ export default function ProductionHeader({
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setTimeout(() => setIsFocused(false), 250)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && results.length > 0) {
+                  e.preventDefault();
+                  handleSelectResult(results[0]);
+                }
+              }}
               placeholder={t.searchPlaceholder}
               className="pl-9 pr-8 h-10 rounded-2xl bg-background/95 backdrop-blur-md border shadow-sm text-xs sm:text-sm focus-visible:ring-1 focus-visible:ring-primary"
             />
@@ -128,7 +134,8 @@ export default function ProductionHeader({
                 <button
                   key={r.placeId}
                   type="button"
-                  onMouseDown={() => handleSelectResult(r)}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelectResult(r); }}
+                  onClick={() => handleSelectResult(r)}
                   className="w-full px-3.5 py-2.5 text-left hover:bg-muted/60 transition-colors flex items-start gap-2.5 border-b last:border-b-0 cursor-pointer"
                 >
                   <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
