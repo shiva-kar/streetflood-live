@@ -15,7 +15,13 @@ A real app anyone, anywhere, can open on their phone, see live flood conditions 
 
 ## Phase 1 — Real backend (Lovable Cloud)
 
-- Enable Lovable Cloud: database, accounts, photo storage.
+- **Zero-cost rule:** hosting stays on free GitHub Pages via the existing GitHub workflow. It's a static site, so everything runs in the browser with no paid servers.
+- **Free services only:** a free-tier Supabase project you create yourself (500 MB database, 1 GB photos), connected straight from the browser with security rules in the database. Lovable Cloud is not used because it charges credits once the free allowance runs out. Maps, search, routing and shelters use free OpenStreetMap services (tiles, Nominatim, OSRM, Overpass). Weather and elevation use Open-Meteo, which is free and needs no key.
+- **No paid notifications:** alerts show in the app, plus browser notifications while it's open. No paid push service.
+- **Free sign-in:** email magic link and Google, both free on Supabase.
+- **Rate limits:** free services are throttled and cached. If one is down, the app shows a clear message and uses cached data.
+- **Keeping the database awake:** free Supabase pauses after 7 days with no activity, so a free daily GitHub Action keeps it awake.
+- I'll give you 3 copy-paste steps to connect Supabase. The browser keys are public by design and are passed in as GitHub build variables.
 - Tables: reports, report votes (confirm / "no longer flooded"), road incidents, alerts, shelters, user profiles, roles, alert subscriptions.
 - Accounts: email + Google sign-in. Browsing is open to everyone; reporting requires sign-in (stops spam).
 - Roles: `citizen`, `moderator`, `authority`, `admin` in a separate roles table. Control Room only visible to authority/moderator; admin grants roles.
