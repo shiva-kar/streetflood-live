@@ -1,0 +1,16 @@
+{
+  "short_name": "StreetFlood",
+  "name": "StreetFlood Live – Flood Monitoring & Safe Routes",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#0284c7",
+  "background_color": "#0f172a",
+  "description": "Hyperlocal street-level flood monitoring map, crowdsourced reports, safe routing, predictive early warnings, and emergency evacuation assistance."
+}

@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type * as LType from "leaflet";
-import {
-  AFFECTED_ROAD_CORRIDORS,
-  GRID,
-  MAP_CENTER,
-  type StaticRoadCorridor,
-} from "@/lib/flood/data";
-import { distanceKm, tileBounds, tileAt } from "@/lib/flood/engine";
+import { MAP_CENTER, type StaticRoadCorridor } from "@/lib/flood/data";
 import { SION_KURLA_OSM_ROADS, evaluateOsmRoadRisk } from "@/lib/flood/osmNetwork";
+import { CELL_DLAT, getDLngForLat, tileIdFromLatLng } from "@/lib/flood/dynamicGrid";
 import type {
   FloodReport,
   MapLayerOptions,
@@ -16,6 +11,15 @@ import type {
   Shelter,
   Tile,
 } from "@/lib/flood/types";
+
+export interface ViewportBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+  centerLat: number;
+  centerLng: number;
+}
 
 export interface FloodMapProps {
   tiles: Tile[];
@@ -42,10 +46,12 @@ export interface FloodMapProps {
   userPos?: [number, number] | null;
   focus?: { lat: number; lng: number; zoom?: number; key: number } | null;
   pickMode?: boolean;
+  initialCenter?: [number, number];
   onTileClick: (tileId: string, lat: number, lng: number) => void;
   onShelterClick?: (shelterId: string) => void;
   onRoadCorridorClick?: (corridor: StaticRoadCorridor) => void;
   onViewportChange?: (ids: Set<string>) => void;
+  onBoundsChange?: (bounds: ViewportBounds) => void;
 }
 
 const RISK_HEX: Record<RiskLevel, string> = {
@@ -76,10 +82,11 @@ export default function FloodMap(props: FloodMapProps) {
   // Initialize Map
   useEffect(() => {
     if (!L || !el.current || map.current) return;
+    const initialCenter = props.initialCenter || props.userPos || MAP_CENTER;
     const m = L.map(el.current, {
-      center: MAP_CENTER,
+      center: initialCenter,
       zoom: 15,
-      minZoom: 12,
+      minZoom: 3,
       maxZoom: 19,
       zoomControl: false,
       preferCanvas: true,
@@ -107,15 +114,6 @@ export default function FloodMap(props: FloodMapProps) {
         '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
     }).addTo(m);
 
-    const s = GRID.south;
-    const w = GRID.west;
-    m.setMaxBounds(
-      L.latLngBounds(
-        [s - 0.04, w - 0.04],
-        [s + GRID.rows * GRID.dLat + 0.04, w + GRID.cols * GRID.dLng + 0.04],
-      ),
-    );
-
     for (const k of [
       "corridors",
       "incidents",
@@ -130,10 +128,8 @@ export default function FloodMap(props: FloodMapProps) {
     }
 
     m.on("click", (e: LType.LeafletMouseEvent) => {
-      const id = tileAt(e.latlng.lat, e.latlng.lng);
-      if (id) {
-        propsRef.current.onTileClick(id, e.latlng.lat, e.latlng.lng);
-      }
+      const tid = tileIdFromLatLng(e.latlng.lat, e.latlng.lng);
+      propsRef.current.onTileClick(tid, e.latlng.lat, e.latlng.lng);
     });
 
     m.on("zoomend", () => {
@@ -142,11 +138,20 @@ export default function FloodMap(props: FloodMapProps) {
 
     const emitViewport = () => {
       const b = m.getBounds();
+      const center = m.getCenter();
       const ids = new Set<string>();
       for (const t of propsRef.current.tiles) {
         if (b.contains([t.centerLat, t.centerLng])) ids.add(t.id);
       }
       propsRef.current.onViewportChange?.(ids);
+      propsRef.current.onBoundsChange?.({
+        south: b.getSouth(),
+        west: b.getWest(),
+        north: b.getNorth(),
+        east: b.getEast(),
+        centerLat: center.lat,
+        centerLng: center.lng,
+      });
     };
 
     m.on("moveend", emitViewport);
@@ -171,31 +176,58 @@ export default function FloodMap(props: FloodMapProps) {
     };
   }, [L]);
 
-  // Tiles grid overlay with Level-of-Detail zoom scaling
+  // Handle focus changes (Place search or GPS jump)
+  useEffect(() => {
+    if (!map.current || !props.focus) return;
+    map.current.flyTo([props.focus.lat, props.focus.lng], props.focus.zoom ?? 15, {
+      duration: 1.0,
+    });
+  }, [props.focus]);
+
+  // Clean soft heat overlay: only renders risk colors where risk > 0!
   useEffect(() => {
     if (!L || !map.current) return;
     const m = map.current;
-    const showGrid = props.layerOptions?.showTechnicalGrid ?? true;
+    const showGrid = props.layerOptions?.showTechnicalGrid ?? false;
 
-    // If grid is toggled off, hide all grid cells
-    if (!showGrid) {
-      for (const r of rects.current.values()) {
-        r.setStyle({
-          stroke: false,
-          fill: false,
-          fillOpacity: 0,
-          opacity: 0,
-        });
+    // Prune stale tiles from cache
+    const activeTileIds = new Set(props.tiles.map((t) => t.id));
+    for (const [id, r] of rects.current.entries()) {
+      if (!activeTileIds.has(id)) {
+        r.remove();
+        rects.current.delete(id);
       }
-      return;
     }
 
-    const isCityZoom = currentZoom < 14;
-
     for (const t of props.tiles) {
+      const hasRisk = t.currentSeverityScore >= 20 || t.closure !== undefined;
+      const isSelected = props.selectedTileId === t.id || props.selectedTileIds?.has(t.id);
+
+      // If no risk and not selected and technical grid is off, leave tile transparent
+      if (!hasRisk && !isSelected && !showGrid) {
+        const existing = rects.current.get(t.id);
+        if (existing) {
+          existing.setStyle({ stroke: false, fill: false, fillOpacity: 0, opacity: 0 });
+        }
+        continue;
+      }
+
       let r = rects.current.get(t.id);
       if (!r) {
-        r = L.rectangle(tileBounds(t.row, t.col), { interactive: true }).addTo(m);
+        const dLng = getDLngForLat(t.centerLat);
+        const south = t.centerLat - CELL_DLAT / 2;
+        const north = t.centerLat + CELL_DLAT / 2;
+        const west = t.centerLng - dLng / 2;
+        const east = t.centerLng + dLng / 2;
+
+        r = L.rectangle(
+          [
+            [south, west],
+            [north, east],
+          ],
+          { interactive: true, pane: "technicalGridPane" },
+        ).addTo(m);
+
         r.on("click", (e) => {
           L.DomEvent.stopPropagation(e);
           propsRef.current.onTileClick(t.id, t.centerLat, t.centerLng);
@@ -207,35 +239,34 @@ export default function FloodMap(props: FloodMapProps) {
       const isDimmed =
         props.onlyHighCritical &&
         (t.currentRiskLevel === "Low" || t.currentRiskLevel === "Moderate");
-      const isSelected = props.selectedTileId === t.id || props.selectedTileIds?.has(t.id);
 
-      // Clean, readable opacity levels
-      let baseOpacity = 0.08;
-      if (t.currentRiskLevel === "Moderate") baseOpacity = 0.28;
-      if (t.currentRiskLevel === "High") baseOpacity = 0.45;
-      if (t.currentRiskLevel === "Critical") baseOpacity = 0.65;
+      // Soft natural heat opacity
+      let fillOpacity = 0;
+      if (t.currentRiskLevel === "Moderate") fillOpacity = 0.25;
+      else if (t.currentRiskLevel === "High") fillOpacity = 0.42;
+      else if (t.currentRiskLevel === "Critical") fillOpacity = 0.65;
 
       let strokeColor = color;
-      let strokeWeight = isCityZoom ? 0 : 0.6;
-      let strokeOpacity = isCityZoom ? 0 : 0.25;
+      let strokeWeight = showGrid ? 0.6 : 0;
+      let strokeOpacity = showGrid ? 0.2 : 0;
       let dashArray: string | undefined = undefined;
 
-      // 3h Predicted overlay: Only Moderate predicted gets an amber dashed outline
+      // 3h Predictive overlay
       if (
         props.showPredicted &&
         t.predictedRisk === "Moderate" &&
         t.currentRiskLevel !== "Critical"
       ) {
         strokeColor = "#f59e0b";
-        strokeWeight = 2;
-        strokeOpacity = 0.9;
-        dashArray = "4 3";
+        strokeWeight = 1.8;
+        strokeOpacity = 0.85;
+        dashArray = "4, 3";
       }
 
       // Selected tile outline
       if (isSelected) {
         strokeColor = "#0284c7";
-        strokeWeight = 3;
+        strokeWeight = 2.5;
         strokeOpacity = 1;
         dashArray = undefined;
       }
@@ -246,7 +277,7 @@ export default function FloodMap(props: FloodMapProps) {
         opacity: isDimmed ? 0.05 : strokeOpacity,
         dashArray: dashArray,
         fillColor: color,
-        fillOpacity: isDimmed ? 0.02 : baseOpacity,
+        fillOpacity: isDimmed ? 0.02 : fillOpacity,
       });
 
       if (isSelected) {
@@ -264,7 +295,7 @@ export default function FloodMap(props: FloodMapProps) {
     currentZoom,
   ]);
 
-  // Authoritative OpenStreetMap road network overlay (Feature 6)
+  // Roads overlay: only highlights risky or closed roads! Normal roads stay pristine
   useEffect(() => {
     if (!L) return;
     const g = layers.current.corridors;
@@ -276,42 +307,32 @@ export default function FloodMap(props: FloodMapProps) {
     const tileMap = new Map(props.tiles.map((t) => [t.id, t]));
 
     for (const road of SION_KURLA_OSM_ROADS) {
-      // Only at extreme bird-eye zoom (< 12) limit to major arterials
-      if (!road.isMajor && currentZoom < 12) continue;
-
       const evalResult = evaluateOsmRoadRisk(road, tileMap, props.incidents, props.reports);
       const { riskLevel, severityScore, reason } = evalResult;
 
-      let strokeColor = "#16a34a"; // Low Risk: Clean Passable Green
-      let weight = currentZoom < 15 ? 2.5 : 3.5;
-      let opacity = 0.8;
+      // Clean map design: do NOT draw normal/low-risk roads green
+      if (riskLevel === "Low" || riskLevel === "Unassessed") continue;
+
+      let strokeColor = "#eab308";
+      let weight = currentZoom < 15 ? 3.5 : 4.5;
+      let opacity = 0.9;
       let dashArray: string | undefined = undefined;
 
       if (riskLevel === "Closed") {
         strokeColor = "#b91c1c";
-        weight = currentZoom < 15 ? 4.8 : 5.8;
+        weight = 5.5;
         opacity = 1.0;
         dashArray = "6, 6";
       } else if (riskLevel === "Critical") {
         strokeColor = "#dc2626";
-        weight = currentZoom < 15 ? 4.2 : 5.2;
+        weight = 5.0;
         opacity = 0.95;
       } else if (riskLevel === "High") {
         strokeColor = "#ea580c";
-        weight = currentZoom < 15 ? 3.8 : 4.8;
+        weight = 4.2;
         opacity = 0.95;
-      } else if (riskLevel === "Moderate") {
-        strokeColor = "#eab308"; // Moderate Risk: Vibrant Waterlogged Yellow
-        weight = currentZoom < 15 ? 3.2 : 4.2;
-        opacity = 0.9;
-      } else if (riskLevel === "Unassessed") {
-        strokeColor = "#94a3b8";
-        weight = 1.5;
-        opacity = 0.4;
-        dashArray = "4, 4";
       }
 
-      // Render actual road polyline strictly on the OSM road geometry
       const line = L.polyline(road.coordinates, {
         pane: "osmRoadsPane",
         color: strokeColor,
@@ -324,9 +345,9 @@ export default function FloodMap(props: FloodMapProps) {
       }).addTo(g);
 
       line.bindTooltip(
-        `<div class="p-1.5 text-xs font-sans">
-          <strong class="text-slate-900">${road.name}</strong><br/>
-          <span style="color:#64748b; font-size:11px;">${road.highway.toUpperCase()} • ${road.lengthMeters}m</span><br/>
+        `<div class="p-1 text-xs font-sans">
+          <strong>${road.name}</strong><br/>
+          <span style="color:#64748b; font-size:11px;">${road.highway.toUpperCase()}</span><br/>
           <span class="font-bold ${
             riskLevel === "Closed"
               ? "text-red-600"
@@ -334,11 +355,9 @@ export default function FloodMap(props: FloodMapProps) {
                 ? "text-red-500"
                 : riskLevel === "High"
                   ? "text-orange-500"
-                  : riskLevel === "Moderate"
-                    ? "text-amber-500"
-                    : "text-emerald-600"
+                  : "text-amber-500"
           }">
-            Status: ${riskLevel === "Closed" ? "⛔ Closed to Traffic" : `${riskLevel} Risk (${severityScore}/100)`}
+            ${riskLevel === "Closed" ? "⛔ Closed to Traffic" : `${riskLevel} Flood Risk (${severityScore}/100)`}
           </span><br/>
           <span style="font-size:10px; color:#475569;">${reason}</span>
         </div>`,
@@ -355,7 +374,7 @@ export default function FloodMap(props: FloodMapProps) {
     }
   }, [L, props.tiles, props.incidents, props.reports, props.layerOptions?.showAffectedRoads, currentZoom]);
 
-  // Road closures overlay (Dashed red box + hazard pin)
+  // Road closures overlay (Hazard pins)
   useEffect(() => {
     if (!L) return;
     const g = layers.current.incidents;
@@ -365,26 +384,14 @@ export default function FloodMap(props: FloodMapProps) {
     if (props.layerOptions?.showClosures === false) return;
 
     for (const i of props.incidents) {
-      const [row, col] = i.tileId.slice(2).split("_").map(Number);
-      const b = tileBounds(row, col);
-
-      L.rectangle(b, {
-        interactive: false,
-        color: "#dc2626",
-        weight: 2.5,
-        fillColor: "#dc2626",
-        fillOpacity: 0.15,
-        className: "sf-closure",
-      }).addTo(g);
-
       const label =
         i.status === "ClosedAllTraffic" ? "⛔" : i.status === "ClosedSmallVehicles" ? "🚫" : "⚠️";
-      const marker = L.marker([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2], {
+      const marker = L.marker([i.lat, i.lng], {
         interactive: true,
         zIndexOffset: 500,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-closure-pin cursor-pointer hover:scale-110 transition-transform" title="Road Incident: ${i.description}">${label}</span>`,
+          html: `<span class="sf-closure-pin cursor-pointer hover:scale-110 transition-transform shadow-md" title="Road Incident: ${i.description}">${label}</span>`,
           iconSize: [28, 28],
           iconAnchor: [14, 14],
         }),
@@ -392,36 +399,10 @@ export default function FloodMap(props: FloodMapProps) {
 
       marker.on("click", (e) => {
         L.DomEvent.stopPropagation(e);
-        propsRef.current.onTileClick(i.tileId, (b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2);
+        propsRef.current.onTileClick(i.tileId, i.lat, i.lng);
       });
     }
   }, [L, props.incidents, props.layerOptions?.showClosures]);
-
-  // Alert badges: ONLY rendered for specific official targeted alerts, NOT all 576 tiles!
-  useEffect(() => {
-    if (!L) return;
-    const g = layers.current.badges;
-    if (!g) return;
-    g.clearLayers();
-
-    // At city zoom, avoid cluttering
-    if (currentZoom < 13) return;
-
-    for (const t of props.tiles) {
-      if (!props.alertTileIds.has(t.id)) continue;
-      const [[s], [n, e]] = tileBounds(t.row, t.col);
-      L.marker([n - (n - s) * 0.22, e - GRID.dLng * 0.22], {
-        interactive: false,
-        zIndexOffset: 400,
-        icon: L.divIcon({
-          className: "sf-icon",
-          html: `<span class="sf-badge animate-pulse" title="Active Municipal Alert on this block">!</span>`,
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
-        }),
-      }).addTo(g);
-    }
-  }, [L, props.tiles, props.alertTileIds, currentZoom]);
 
   // Crowdsourced Report markers
   useEffect(() => {
@@ -434,18 +415,30 @@ export default function FloodMap(props: FloodMapProps) {
     const mode = props.showReports ?? "all";
     if (mode === "none") return;
 
+    const ICONS: Record<string, string> = {
+      Footpath: "🦶",
+      Ankles: "👞",
+      Knees: "🛵",
+      WaistPlus: "⚠️",
+    };
+
     for (const r of props.reports) {
       if (r.status === "Dismissed") continue;
       if (mode === "unverified" && r.status !== "Unverified") continue;
+
+      const iconEmoji = ICONS[r.severityUser] || "💧";
+      const isVerified = r.status === "Verified";
 
       const marker = L.marker([r.lat, r.lng], {
         interactive: true,
         zIndexOffset: 300,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-report cursor-pointer hover:scale-125 transition-transform ${r.status === "Verified" ? "is-verified" : ""}" title="${r.status}: ${r.description}"></span>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
+          html: `<span class="flex items-center justify-center w-7 h-7 rounded-full bg-white dark:bg-slate-900 border-2 ${
+            isVerified ? "border-emerald-500 shadow-emerald-500/30" : "border-amber-500"
+          } shadow-md cursor-pointer hover:scale-125 transition-transform text-xs" title="${r.status}: ${r.severityUser} - ${r.description}">${iconEmoji}</span>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
         }),
       }).addTo(g);
 
@@ -456,7 +449,7 @@ export default function FloodMap(props: FloodMapProps) {
     }
   }, [L, props.reports, props.showReports, props.layerOptions?.showReports]);
 
-  // Relief Shelters markers
+  // Shelters markers
   useEffect(() => {
     if (!L) return;
     const g = layers.current.shelters;
@@ -472,9 +465,11 @@ export default function FloodMap(props: FloodMapProps) {
         zIndexOffset: isHighlighted ? 1200 : 250,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-shelter cursor-pointer hover:scale-110 transition-transform ${isHighlighted ? "is-hl" : ""}" title="${s.name} (${s.capacityStatus})">⌂</span>`,
-          iconSize: isHighlighted ? [38, 38] : [28, 28],
-          iconAnchor: isHighlighted ? [19, 19] : [14, 14],
+          html: `<span class="sf-shelter cursor-pointer hover:scale-110 transition-transform ${
+            isHighlighted ? "is-hl shadow-lg ring-2 ring-white" : ""
+          }" title="${s.name} (${s.capacityStatus})">⌂</span>`,
+          iconSize: isHighlighted ? [36, 36] : [26, 26],
+          iconAnchor: isHighlighted ? [18, 18] : [13, 13],
         }),
       }).addTo(g);
 
@@ -486,11 +481,11 @@ export default function FloodMap(props: FloodMapProps) {
 
     if (props.highlightShelterId) {
       const s = props.shelters.find((x) => x.id === props.highlightShelterId);
-      if (s) map.current?.flyTo([s.lat, s.lng], 17, { duration: 0.6 });
+      if (s) map.current?.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
     }
   }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters]);
 
-  // Route visualization - ACTUAL ROAD NETWORK ROUTE
+  // Safe road route polyline
   useEffect(() => {
     if (!L) return;
     const g = layers.current.route;
@@ -499,48 +494,20 @@ export default function FloodMap(props: FloodMapProps) {
 
     if (props.layerOptions?.showEvacuationRoute === false) return;
 
-    const pin = (
-      coord: [number, number] | null | undefined,
-      text: string,
-      color: string,
-      title: string,
-    ) => {
-      if (!coord) return;
-      L.marker(coord, {
-        interactive: false,
-        zIndexOffset: 1600,
-        icon: L.divIcon({
-          className: "sf-icon",
-          html: `<span class="sf-route-pin shadow-lg flex items-center justify-center font-bold text-white text-xs rounded-full border-2 border-white" style="background:${color}; width:28px; height:28px;" title="${title}">${text}</span>`,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        }),
-      }).addTo(g);
-    };
-
     if (props.roadRouteCoords && props.roadRouteCoords.length > 0) {
       const pts = props.roadRouteCoords;
       const isImpassable = props.roadRouteSafety === "Impassable";
-      const isHighRisk = props.roadRouteSafety === "HighRisk";
-      const isCaution = props.roadRouteSafety === "Caution";
+      const routeColor = isImpassable ? "#dc2626" : "#059669";
 
-      const routeColor = isImpassable
-        ? "#dc2626"
-        : isHighRisk
-          ? "#ea580c"
-          : isCaution
-            ? "#4f46e5"
-            : "#2563eb";
-
-      // White outline casing for contrast
+      // White outline casing
       L.polyline(pts, {
         color: "#ffffff",
-        weight: 9,
+        weight: 8,
         opacity: 0.95,
         interactive: false,
       }).addTo(g);
 
-      // Main road polyline
+      // Main line
       L.polyline(pts, {
         pane: "evacuationRoutePane",
         color: routeColor,
@@ -549,59 +516,10 @@ export default function FloodMap(props: FloodMapProps) {
         dashArray: isImpassable ? "8, 8" : undefined,
         interactive: false,
       }).addTo(g);
-
-      map.current?.fitBounds(L.latLngBounds(pts).pad(0.18), { maxZoom: 17 });
-    } else if (props.routePath?.length) {
-      const pts = props.routePath.map((t) => [t.centerLat, t.centerLng] as [number, number]);
-      L.polyline(pts, {
-        color: "#6366f1",
-        weight: 4,
-        opacity: 0.6,
-        dashArray: "4, 4",
-        interactive: false,
-      }).addTo(g);
     }
+  }, [L, props.roadRouteCoords, props.roadRouteSafety, props.layerOptions?.showEvacuationRoute]);
 
-    const fromCoord =
-      props.routeFromCoord ||
-      (props.routeFromId
-        ? (() => {
-            const t = props.tiles.find((x) => x.id === props.routeFromId);
-            return t ? ([t.centerLat, t.centerLng] as [number, number]) : null;
-          })()
-        : null);
-
-    const toCoord =
-      props.routeToCoord ||
-      (props.routeToId
-        ? (() => {
-            const t = props.tiles.find((x) => x.id === props.routeToId);
-            return t ? ([t.centerLat, t.centerLng] as [number, number]) : null;
-          })()
-        : null);
-
-    pin(fromCoord, "A", "#10b981", "Starting Location (A)");
-    pin(
-      toCoord,
-      props.isShelterDestination ? "⌂" : "B",
-      props.isShelterDestination ? "#0284c7" : "#2563eb",
-      props.isShelterDestination ? "Relief Shelter Destination" : "Destination Point (B)",
-    );
-  }, [
-    L,
-    props.roadRouteCoords,
-    props.roadRouteSafety,
-    props.routeFromCoord,
-    props.routeToCoord,
-    props.routeFromId,
-    props.routeToId,
-    props.routePath,
-    props.isShelterDestination,
-    props.layerOptions?.showEvacuationRoute,
-    props.tiles,
-  ]);
-
-  // User position marker
+  // User GPS position marker
   useEffect(() => {
     if (!L) return;
     const g = layers.current.user;
@@ -613,63 +531,17 @@ export default function FloodMap(props: FloodMapProps) {
         zIndexOffset: 1100,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-user" title="Your Location"></span>`,
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
+          html: `<span class="sf-user animate-pulse" title="Your GPS Location"></span>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
         }),
       }).addTo(g);
     }
   }, [L, props.userPos]);
 
-  // Pulse wave animation on new report
-  useEffect(() => {
-    if (!L) return;
-    const g = layers.current.pulse;
-    if (!g || !props.pulseTileId) return;
-    g.clearLayers();
-    const t = props.tiles.find((x) => x.id === props.pulseTileId);
-    if (!t) return;
-
-    L.marker([t.centerLat, t.centerLng], {
-      interactive: false,
-      zIndexOffset: 1600,
-      icon: L.divIcon({
-        className: "sf-icon",
-        html: `<span class="sf-pulse"></span>`,
-        iconSize: [60, 60],
-        iconAnchor: [30, 30],
-      }),
-    }).addTo(g);
-
-    const timer = setTimeout(() => g.clearLayers(), 3500);
-    return () => clearTimeout(timer);
-  }, [L, props.pulseTileId, props.tiles]);
-
-  // Focus flyTo
-  useEffect(() => {
-    if (props.focus && map.current) {
-      map.current.flyTo([props.focus.lat, props.focus.lng], props.focus.zoom ?? 16, {
-        duration: 0.6,
-      });
-    }
-  }, [props.focus]);
-
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <div
-        ref={el}
-        className={`h-full w-full ${props.pickMode ? "sf-picking" : ""}`}
-        role="application"
-        aria-label="StreetFlood Live interactive flood severity map. Click any tile to inspect street level risk."
-      />
-      {!L && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 gap-3 z-30">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            Initializing street-level map grid...
-          </p>
-        </div>
-      )}
+    <div className="relative w-full h-full overflow-hidden">
+      <div ref={el} className="w-full h-full" />
     </div>
   );
 }

@@ -1,805 +1,437 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import {
-  Plus,
-  Navigation,
-  LocateFixed,
-  Sparkles,
-  ShieldAlert,
-  Sliders,
-  X,
-  Compass,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import FloodMap from "@/components/flood/FloodMap";
-import Header from "@/components/flood/Header";
-import SafetyBanner from "@/components/flood/SafetyBanner";
-import TileDetailsSheet from "@/components/flood/TileDetailsSheet";
-import CorridorOverview from "@/components/flood/CorridorOverview";
-import ReportDialog from "@/components/flood/ReportDialog";
-import RoutePanel from "@/components/flood/RoutePanel";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import FloodMap, { type ViewportBounds } from "@/components/flood/FloodMap";
+import ProductionHeader from "@/components/flood/ProductionHeader";
+import ProductionBottomSheet from "@/components/flood/ProductionBottomSheet";
+import BottomNav from "@/components/flood/BottomNav";
+import ThreeTapReportModal from "@/components/flood/ThreeTapReportModal";
+import AuthModal from "@/components/flood/AuthModal";
+import EmergencyHelpModal from "@/components/flood/EmergencyHelpModal";
+import ControlRoomModal from "@/components/flood/ControlRoomModal";
 import AlertsDrawer from "@/components/flood/AlertsDrawer";
-import PreparednessModal from "@/components/flood/PreparednessModal";
-import SimulationDrawer from "@/components/flood/SimulationDrawer";
-import AuthorityDashboard from "@/components/flood/AuthorityDashboard";
-import MapLegend from "@/components/flood/MapLegend";
-import MapLayerControls from "@/components/flood/MapLayerControls";
-import { useAppState, getState } from "@/lib/flood/store";
 import {
-  computeTiles,
-  planRoute,
-  predictiveAlerts,
-  tileAt,
-  type RouteResult,
-} from "@/lib/flood/engine";
-import { calculateRoadRoute, findBestShelterEvacuation } from "@/lib/flood/roadRouting";
-import { MAP_CENTER, SHELTERS, ZONES } from "@/lib/flood/data";
+  fetchRealWeather,
+  fetchOsmShelters,
+  getCurrentUserGps,
+  calculateWorldwideSafeRoute,
+  type RealWeatherResult,
+} from "@/lib/flood/openData";
+import { generateViewportTiles, tileIdFromLatLng } from "@/lib/flood/dynamicGrid";
+import {
+  fetchLiveReports,
+  fetchLiveIncidents,
+  fetchLiveAlerts,
+  getCurrentUser,
+  getUserProfile,
+  isSupabaseConfigured,
+  getSupabase,
+  getQueuedOfflineReports,
+  clearQueuedReport,
+  submitLiveReport,
+  type UserProfile,
+} from "@/lib/supabase/client";
+import { useAppState, getState, setState } from "@/lib/flood/store";
+import { MAP_CENTER, SHELTERS as INITIAL_SHELTERS } from "@/lib/flood/data";
+import type { FloodAlert, FloodReport, RoadIncident, Shelter, Tile } from "@/lib/flood/types";
 import { toast } from "sonner";
-import type { MapLayerOptions, RoadRouteResult, ShelterCandidate, Tile } from "@/lib/flood/types";
 
 export const Route = createFileRoute("/")({
   component: StreetFloodApp,
 });
 
-function StreetFloodApp() {
-  const state = useAppState();
+export default function StreetFloodApp() {
+  const localState = useAppState() || getState();
 
-  // Mode: Resident view vs Authority control room
-  const [mode, setMode] = useState<"resident" | "authority">("resident");
+  // User and Auth State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [demoMode, setDemoMode] = useState<boolean>(false);
 
-  // Overlays & Toggles
-  const [showPredicted, setShowPredicted] = useState(true);
-  const [onlyHighCritical, setOnlyHighCritical] = useState(false);
-  const [showReportsFilter, setShowReportsFilter] = useState<"all" | "unverified" | "none">("all");
-
-  // Selection & Focus
-  const [selectedTileId, setSelectedTileId] = useState<string | null>("t_20_16");
-  const [selectedTileIds, setSelectedTileIds] = useState<Set<string>>(new Set(["t_20_16"]));
-  const [pulseTileId, setPulseTileId] = useState<string | null>(null);
-  const [highlightShelterId, setHighlightShelterId] = useState<string | null>(null);
-  const [viewportTileIds, setViewportTileIds] = useState<Set<string>>(new Set());
+  // User GPS & Center
+  const [userPos, setUserPos] = useState<[number, number]>(MAP_CENTER);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
   const [focus, setFocus] = useState<{
     lat: number;
     lng: number;
     zoom?: number;
     key: number;
   } | null>(null);
-  const [userPos, setUserPos] = useState<[number, number] | null>([19.048, 72.868]);
 
-  // Route State - Road-Based Evacuation & Navigation
-  const [routeFromId, setRouteFromId] = useState<string | null>("t_2_4");
-  const [routeToId, setRouteToId] = useState<string | null>("t_20_16");
-  const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
-  const [roadRoute, setRoadRoute] = useState<RoadRouteResult | null>(null);
-  const [shelterCandidates, setShelterCandidates] = useState<ShelterCandidate[]>([]);
-  const [selectedShelterId, setSelectedShelterId] = useState<string | null>("sh1");
-  const [navMode, setNavMode] = useState<"evacuate" | "custom">("evacuate");
-  const [isRoutingLoading, setIsRoutingLoading] = useState(false);
-  const [pickMode, setPickMode] = useState(false);
-
-  // Map Layer Controls State (Technical Grid ON by default with road corridors)
-  const [layerOptions, setLayerOptions] = useState<MapLayerOptions>({
-    showTechnicalGrid: true,
-    showAffectedRoads: true,
-    showClosures: true,
-    showShelters: true,
-    showEvacuationRoute: true,
-    showReports: true,
+  // Active Viewport Bounding Box
+  const [viewportBounds, setViewportBounds] = useState<ViewportBounds>({
+    south: MAP_CENTER[0] - 0.02,
+    north: MAP_CENTER[0] + 0.02,
+    west: MAP_CENTER[1] - 0.02,
+    east: MAP_CENTER[1] + 0.02,
+    centerLat: MAP_CENTER[0],
+    centerLng: MAP_CENTER[1],
   });
 
-  // Modal / Drawer visibility
-  const [routePanelOpen, setRoutePanelOpen] = useState(false);
-  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  // Real Data: Weather, Shelters, Reports, Incidents, Alerts
+  const [weather, setWeather] = useState<RealWeatherResult | null>(null);
+  const [shelters, setShelters] = useState<Shelter[]>(INITIAL_SHELTERS);
+  const [liveReports, setLiveReports] = useState<FloodReport[]>(localState.reports);
+  const [liveIncidents, setLiveIncidents] = useState<RoadIncident[]>(localState.incidents);
+  const [liveAlerts, setLiveAlerts] = useState<FloodAlert[]>(localState.alerts);
+
+  // Selection & Navigation
+  const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"map" | "report" | "alerts" | "help">("map");
+  const [roadRoute, setRoadRoute] = useState<Awaited<ReturnType<typeof calculateWorldwideSafeRoute>> | null>(null);
+
+  // Modals & Drawers
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [controlRoomOpen, setControlRoomOpen] = useState(false);
   const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
-  const [prepModalOpen, setPrepModalOpen] = useState(false);
-  const [simDrawerOpen, setSimDrawerOpen] = useState(false);
 
-  // Mobile Bottom Sheet expanded state
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  // 1. Initial User Geolocation
+  useEffect(() => {
+    setIsLocating(true);
+    getCurrentUserGps()
+      .then((res) => {
+        setUserPos([res.lat, res.lng]);
+        setFocus({ lat: res.lat, lng: res.lng, zoom: 15, key: Date.now() });
+      })
+      .catch((err) => {
+        console.warn("GPS init info:", err.message);
+      })
+      .finally(() => {
+        setIsLocating(false);
+      });
+  }, []);
 
-  // Time ticker
+  // 2. Fetch User Profile & Auth
+  const refreshAuth = useCallback(async () => {
+    try {
+      const u = await getCurrentUser();
+      if (u) {
+        const prof = await getUserProfile(u.id);
+        setCurrentUser(prof);
+      } else {
+        setCurrentUser(null);
+      }
+    } catch {
+      setCurrentUser(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAuth();
+  }, [refreshAuth]);
+
+  // 3. Sync Offline Queued Reports
+  useEffect(() => {
+    const syncOfflineQueue = async () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      const queued = await getQueuedOfflineReports();
+      if (queued.length === 0) return;
+
+      for (const rep of queued) {
+        try {
+          await submitLiveReport({
+            lat: rep.lat,
+            lng: rep.lng,
+            waterDepth: rep.waterDepth,
+            description: rep.description,
+            photoDataUrl: rep.photoUrl,
+          });
+          await clearQueuedReport(rep.id);
+        } catch {
+          // Will retry next interval
+        }
+      }
+      toast.success("Synchronized offline flood reports with server.");
+    };
+
+    syncOfflineQueue();
+    window.addEventListener("online", syncOfflineQueue);
+    return () => window.removeEventListener("online", syncOfflineQueue);
+  }, []);
+
+  // 4. Load Live Reports, Incidents, Alerts from Supabase / Local
+  const loadData = useCallback(async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        const [reps, incs, alts] = await Promise.all([
+          fetchLiveReports(),
+          fetchLiveIncidents(),
+          fetchLiveAlerts(),
+        ]);
+        if (reps.length > 0) setLiveReports(reps);
+        if (incs.length > 0) setLiveIncidents(incs);
+        if (alts.length > 0) setLiveAlerts(alts);
+      } catch (err) {
+        console.warn("Cloud data fetch fallback:", err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  // 5. Fetch Open-Meteo Weather & OSM Shelters for Active Viewport
+  const lastFetchedCenter = useRef<[number, number]>([0, 0]);
+  useEffect(() => {
+    const cLat = viewportBounds.centerLat;
+    const cLng = viewportBounds.centerLng;
+    const dist = Math.hypot(cLat - lastFetchedCenter.current[0], cLng - lastFetchedCenter.current[1]);
+
+    // Only re-fetch if moved > ~2km
+    if (dist < 0.02 && weather !== null) return;
+    lastFetchedCenter.current = [cLat, cLng];
+
+    fetchRealWeather(cLat, cLng).then((w) => setWeather(w));
+
+    fetchOsmShelters(viewportBounds).then((osmShelters) => {
+      if (osmShelters.length > 0) {
+        setShelters((prev) => {
+          const ids = new Set(osmShelters.map((s) => s.id));
+          return [...osmShelters, ...prev.filter((p) => !ids.has(p.id))];
+        });
+      }
+    });
+  }, [viewportBounds, weather]);
+
+  // 6. Dynamic Grid Tile Generation (Worldwide)
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
 
-  // Compute live tiles from state
-  const effectiveState = state || getState();
-  const tiles = useMemo(() => computeTiles(effectiveState, now), [effectiveState, now]);
+  const dynamicTiles = useMemo(() => {
+    return generateViewportTiles(
+      viewportBounds,
+      liveReports,
+      liveIncidents,
+      weather?.recentRainMm || 0,
+      weather?.forecastRain3hMm || 0,
+      now,
+    );
+  }, [viewportBounds, liveReports, liveIncidents, weather, now]);
 
-  // Combined Alerts: Official published alerts + auto-generated predictive alerts
-  const allAlerts = useMemo(() => {
-    const auto = predictiveAlerts(tiles, effectiveState, now);
-    return [...effectiveState.alerts, ...auto];
-  }, [tiles, effectiveState, now]);
+  // Selected tile object
+  const currentTile = useMemo(() => {
+    if (selectedTileId) {
+      const match = dynamicTiles.find((t) => t.id === selectedTileId);
+      if (match) return match;
+    }
+    // Default to user's snapped cell
+    const userCellId = tileIdFromLatLng(userPos[0], userPos[1]);
+    return dynamicTiles.find((t) => t.id === userCellId) || dynamicTiles[0] || null;
+  }, [selectedTileId, dynamicTiles, userPos]);
 
-  // ONLY targeted municipal official alerts should have tile badges!
-  // NEVER include zone-wide predictive alerts that cover hundreds of tiles!
-  const alertTileIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const a of effectiveState.alerts) {
-      if (a.status === "Published" && a.type === "Municipal") {
-        a.tileIds.forEach((id) => set.add(id));
+  // Nearest Shelter Calculation
+  const nearestShelter = useMemo(() => {
+    if (shelters.length === 0) return null;
+    let minD = Infinity;
+    let best: Shelter | null = null;
+    for (const s of shelters) {
+      const d = Math.hypot(s.lat - userPos[0], s.lng - userPos[1]);
+      if (d < minD) {
+        minD = d;
+        best = s;
       }
     }
-    return set;
-  }, [effectiveState.alerts]);
+    return best;
+  }, [shelters, userPos]);
 
-  // Currently selected tile object
-  const selectedTile = useMemo(() => {
-    if (!selectedTileId) return null;
-    return tiles.find((t) => t.id === selectedTileId) || null;
-  }, [tiles, selectedTileId]);
-
-  // Incident active on selected tile
-  const selectedIncident = useMemo(() => {
-    if (!selectedTileId) return null;
-    return effectiveState.incidents.find((i) => i.tileId === selectedTileId) || null;
-  }, [effectiveState.incidents, selectedTileId]);
-
-  // Calculate road route via real street network & flood evaluation layer
-  const handleCalculateRoadRoute = useCallback(
-    async (from: string, to: string) => {
-      setIsRoutingLoading(true);
-      const fromTile = tiles.find((t) => t.id === from);
-      const toTile = tiles.find((t) => t.id === to);
-      if (!fromTile || !toTile) {
-        setIsRoutingLoading(false);
-        return;
-      }
-
-      const res = await calculateRoadRoute(
-        { lat: fromTile.centerLat, lng: fromTile.centerLng },
-        { lat: toTile.centerLat, lng: toTile.centerLng },
-        tiles,
-        effectiveState.reports,
-        effectiveState.incidents,
-      );
-
-      setRoadRoute(res);
-      setIsRoutingLoading(false);
-
-      if (res.safetyStatus === "Impassable") {
-        toast.error(
-          "NO SUFFICIENTLY SAFE ROUTE FOUND: Corridor blocked by closure or critical flooding.",
-        );
-      } else if (res.safetyStatus === "HighRisk") {
-        toast.warning("Caution: Road route passes through high waterlogging segments.");
-      } else {
-        toast.success(
-          `Road route calculated: ${res.distanceKm.toFixed(1)} km (~${res.durationMinutes} mins) following street network.`,
-        );
-      }
-    },
-    [tiles, effectiveState.reports, effectiveState.incidents],
-  );
-
-  // Evacuate to Nearest/Safest Relief Shelter
-  const handleEvacuateToShelter = useCallback(
-    async (from: string, targetShelterId?: string) => {
-      setIsRoutingLoading(true);
-      const fromTile = tiles.find((t) => t.id === from);
-      const originCoord = fromTile
-        ? { lat: fromTile.centerLat, lng: fromTile.centerLng }
-        : { lat: 19.0455, lng: 72.8655 };
-
-      const { recommended, candidates } = await findBestShelterEvacuation(
-        originCoord,
-        SHELTERS,
-        tiles,
-        effectiveState.reports,
-        effectiveState.incidents,
-      );
-
-      setShelterCandidates(candidates);
-
-      const targetCandidate = targetShelterId
-        ? candidates.find((c) => c.shelter.id === targetShelterId) || recommended
-        : recommended;
-
-      if (targetCandidate?.route) {
-        setRoadRoute(targetCandidate.route);
-        setSelectedShelterId(targetCandidate.shelter.id);
-        const targetTileId = tileAt(targetCandidate.shelter.lat, targetCandidate.shelter.lng);
-        if (targetTileId) setRouteToId(targetTileId);
-
-        if (targetCandidate.route.safetyStatus === "Impassable") {
-          toast.error(
-            "Warning: Candidate road route to this shelter encounters road closures or critical inundation.",
-          );
-        } else {
-          toast.success(
-            `Evacuation route calculated: ${targetCandidate.shelter.name} (${targetCandidate.route.distanceKm.toFixed(1)} km road route, ~${targetCandidate.route.durationMinutes} mins)`,
-          );
-        }
-      }
-      setIsRoutingLoading(false);
-    },
-    [tiles, effectiveState.reports, effectiveState.incidents],
-  );
-
-  // Internal grid routing fallback
-  const handleCalculateRoute = useCallback(
-    (from: string, to: string) => {
-      const res = planRoute(tiles, from, to);
-      setRouteResult(res);
-      handleCalculateRoadRoute(from, to);
-    },
-    [tiles, handleCalculateRoadRoute],
-  );
-
-  // Auto calculate route when route panel opens
-  useEffect(() => {
-    if (routePanelOpen && !roadRoute) {
-      if (navMode === "evacuate") {
-        handleEvacuateToShelter(routeFromId || "t_2_4", selectedShelterId || undefined);
-      } else if (routeFromId && routeToId) {
-        handleCalculateRoadRoute(routeFromId, routeToId);
-      }
-    }
-  }, [
-    routePanelOpen,
-    roadRoute,
-    navMode,
-    routeFromId,
-    routeToId,
-    selectedShelterId,
-    handleEvacuateToShelter,
-    handleCalculateRoadRoute,
-  ]);
-
-  // Recalculate route when flood state (rainfall, reports, incidents) changes
-  useEffect(() => {
-    if (routePanelOpen && roadRoute && routeFromId) {
-      if (navMode === "evacuate") {
-        handleEvacuateToShelter(routeFromId, selectedShelterId || undefined);
-      } else if (routeToId) {
-        handleCalculateRoadRoute(routeFromId, routeToId);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveState.reports, effectiveState.incidents, effectiveState.sim.tick]);
-
-  // Map Tile Click
-  const handleTileClick = (tileId: string, lat: number, lng: number) => {
-    if (pickMode) {
-      if (!routeFromId) {
-        setRouteFromId(tileId);
-        toast.info("Origin (A) set from map click.");
-      } else {
-        setRouteToId(tileId);
-        toast.info("Destination (B) set from map click.");
-        setPickMode(false);
-        if (navMode === "custom") {
-          handleCalculateRoadRoute(routeFromId, tileId);
-        } else {
-          handleEvacuateToShelter(tileId, selectedShelterId || undefined);
-        }
-      }
-      return;
-    }
-
-    setSelectedTileId(tileId);
-    setSelectedTileIds(new Set([tileId]));
-    setRoutePanelOpen(false);
-    setMobileSheetOpen(true);
-  };
-
-  // Shelter click
-  const handleShelterClick = (shelterId: string) => {
-    setHighlightShelterId(shelterId);
-    setSelectedShelterId(shelterId);
-    setNavMode("evacuate");
-    setRoutePanelOpen(true);
-    setMobileSheetOpen(true);
-    handleEvacuateToShelter(routeFromId || "t_2_4", shelterId);
-  };
-
-  // Zone Quick Jump
-  const handleJumpToZone = (zoneKey: string) => {
-    const zone = ZONES.find((z) => z.key === zoneKey);
-    if (!zone) return;
-    const centerRow = (zone.rows[0] + zone.rows[1]) / 2;
-    const centerCol = (zone.cols[0] + zone.cols[1]) / 2;
-    const t = tiles.find((x) => x.row === Math.floor(centerRow) && x.col === Math.floor(centerCol));
-    if (t) {
-      setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 16, key: Date.now() });
-      setSelectedTileId(t.id);
-      setSelectedTileIds(new Set([t.id]));
-      setRoutePanelOpen(false);
+  // Handlers
+  const handleLocateUser = async () => {
+    setIsLocating(true);
+    try {
+      const res = await getCurrentUserGps();
+      setUserPos([res.lat, res.lng]);
+      setFocus({ lat: res.lat, lng: res.lng, zoom: 16, key: Date.now() });
+      toast.success("Location updated from GPS.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not acquire location.";
+      toast.error(msg);
+    } finally {
+      setIsLocating(false);
     }
   };
 
-  // Locate User (GPS)
-  const handleLocateMe = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setUserPos([lat, lng]);
-          setFocus({ lat, lng, zoom: 16, key: Date.now() });
-          toast.success("Centered on your GPS location.");
-        },
-        () => {
-          setUserPos([19.048, 72.868]);
-          setFocus({ lat: 19.048, lng: 72.868, zoom: 16, key: Date.now() });
-          toast.info("Centered on Sion–Kurla corridor.");
-        },
-      );
+  const handleSelectPlace = (lat: number, lng: number, name: string) => {
+    setFocus({ lat, lng, zoom: 15, key: Date.now() });
+    toast.info(`Jumped to ${name}`);
+  };
+
+  const handlePlanRouteToShelter = async (shelter: Shelter) => {
+    toast.loading("Calculating safest road route avoiding flood areas...", { id: "routing" });
+    const blocked = liveIncidents.map((i) => ({
+      lat: i.lat,
+      lng: i.lng,
+      description: i.description,
+    }));
+
+    const result = await calculateWorldwideSafeRoute(userPos, [shelter.lat, shelter.lng], blocked);
+    toast.dismiss("routing");
+    if (result) {
+      setRoadRoute(result);
+      toast.success(`Route calculated: ${result.distanceKm} km (${result.durationMinutes} min)`);
+    } else {
+      toast.error("Could not find a road route to this shelter.");
     }
   };
+
+  const handleReportCreated = (newReport: FloodReport) => {
+    setLiveReports((prev) => [newReport, ...prev]);
+    setState((s) => ({ ...s, reports: [newReport, ...s.reports] }));
+  };
+
+  const handleVerifyReport = (id: string) => {
+    setLiveReports((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: "Verified" as const } : r)),
+    );
+    setState((s) => ({
+      ...s,
+      reports: s.reports.map((r) => (r.id === id ? { ...r, status: "Verified" as const } : r)),
+    }));
+  };
+
+  const handleDismissReport = (id: string) => {
+    setLiveReports((prev) => prev.filter((r) => r.id !== id));
+    setState((s) => ({
+      ...s,
+      reports: s.reports.filter((r) => r.id !== id),
+    }));
+  };
+
+  const handleAddIncident = (newInc: RoadIncident) => {
+    setLiveIncidents((prev) => [newInc, ...prev]);
+    setState((s) => ({ ...s, incidents: [newInc, ...s.incidents] }));
+  };
+
+  const handleAddAlert = (newAlert: FloodAlert) => {
+    setLiveAlerts((prev) => [newAlert, ...prev]);
+    setState((s) => ({ ...s, alerts: [newAlert, ...s.alerts] }));
+  };
+
+  const canAccessControlRoom =
+    currentUser?.role === "authority" ||
+    currentUser?.role === "moderator" ||
+    currentUser?.role === "admin" ||
+    demoMode;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      {/* 1. Top Persistent Header */}
-      <Header
-        mode={mode}
-        onModeChange={(m) => {
-          setMode(m);
-          if (m === "authority") {
-            setRoutePanelOpen(false);
-            setMobileSheetOpen(true);
-          }
-        }}
-        state={effectiveState}
-        tiles={tiles}
-        alerts={allAlerts.filter((a) => a.status === "Published")}
-        onOpenAlerts={() => setAlertsDrawerOpen(true)}
-        onOpenRoute={() => {
-          setRoutePanelOpen((prev) => !prev);
-          setMobileSheetOpen(true);
-        }}
-        onOpenPreparedness={() => setPrepModalOpen(true)}
-        onOpenSimulation={() => setSimDrawerOpen(true)}
-        onOpenReport={() => setReportDialogOpen(true)}
-        onSelectZone={handleJumpToZone}
+    <div className="relative w-full h-[100dvh] overflow-hidden flex flex-col bg-background select-none font-sans">
+      {/* 1. TOP HEADER (SEARCH + GPS + PROFILE) */}
+      <ProductionHeader
+        onSelectPlace={handleSelectPlace}
+        onLocateUser={handleLocateUser}
+        isLocating={isLocating}
+        currentUser={currentUser}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenControlRoom={() => setControlRoomOpen(true)}
+        canAccessControlRoom={canAccessControlRoom}
+        demoMode={demoMode}
       />
 
-      {/* 2. Safety Prototype Notice Banner */}
-      <SafetyBanner />
-
-      {/* 3. Main Workspace Layout */}
-      <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
-        {/* DESKTOP SIDE PANEL (Always visible on lg+ screens) */}
-        <aside
-          aria-label="Contextual Command Panel"
-          className="hidden lg:flex w-[420px] xl:w-[460px] h-full flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg z-20 shrink-0 overflow-hidden"
-        >
-          {mode === "authority" ? (
-            <AuthorityDashboard
-              state={effectiveState}
-              tiles={tiles}
-              onFocusTile={(id) => {
-                const t = tiles.find((x) => x.id === id);
-                if (t) {
-                  setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 17, key: Date.now() });
-                  setSelectedTileId(id);
-                  setSelectedTileIds(new Set([id]));
-                }
-              }}
-              onOpenSimulation={() => setSimDrawerOpen(true)}
-            />
-          ) : routePanelOpen ? (
-            <RoutePanel
-              tiles={tiles}
-              shelters={SHELTERS}
-              reports={effectiveState.reports}
-              incidents={effectiveState.incidents}
-              roadRoute={roadRoute}
-              shelterCandidates={shelterCandidates}
-              selectedShelterId={selectedShelterId}
-              fromId={routeFromId}
-              toId={routeToId}
-              navMode={navMode}
-              pickMode={pickMode}
-              isLoading={isRoutingLoading}
-              onNavModeChange={setNavMode}
-              onSelectFrom={setRouteFromId}
-              onSelectTo={setRouteToId}
-              onSelectShelter={(sId) => {
-                setSelectedShelterId(sId);
-                handleEvacuateToShelter(routeFromId || "t_2_4", sId);
-              }}
-              onCalculateRoadRoute={handleCalculateRoadRoute}
-              onEvacuateToShelter={handleEvacuateToShelter}
-              onClearRoute={() => {
-                setRoadRoute(null);
-                setRouteResult(null);
-              }}
-              onTogglePickMode={() => setPickMode(!pickMode)}
-              onClose={() => setRoutePanelOpen(false)}
-              onOpenPreparedness={() => setPrepModalOpen(true)}
-            />
-          ) : selectedTile ? (
-            <TileDetailsSheet
-              tile={selectedTile}
-              reports={effectiveState.reports}
-              incident={selectedIncident}
-              onClose={() => setSelectedTileId(null)}
-              onReportHere={(id) => {
-                setSelectedTileId(id);
-                setReportDialogOpen(true);
-              }}
-              onRouteFrom={(id) => {
-                setRouteFromId(id);
-                setRoutePanelOpen(true);
-                if (routeToId) handleCalculateRoute(id, routeToId);
-              }}
-              onRouteTo={(id) => {
-                setRouteToId(id);
-                setRoutePanelOpen(true);
-                if (routeFromId) handleCalculateRoute(routeFromId, id);
-              }}
-              onOpenPreparedness={() => setPrepModalOpen(true)}
-            />
-          ) : (
-            <CorridorOverview
-              tiles={tiles}
-              state={effectiveState}
-              alerts={allAlerts}
-              onSelectZone={handleJumpToZone}
-              onOpenReport={() => setReportDialogOpen(true)}
-              onOpenRoute={() => setRoutePanelOpen(true)}
-              onOpenPreparedness={() => setPrepModalOpen(true)}
-            />
-          )}
-        </aside>
-
-        {/* MAP CONTAINER (Fills remaining flex space) */}
-        <main className="flex-1 h-full relative overflow-hidden bg-slate-200 dark:bg-slate-900">
-          <FloodMap
-            tiles={tiles}
-            reports={effectiveState.reports}
-            incidents={effectiveState.incidents}
-            shelters={SHELTERS}
-            alertTileIds={alertTileIds}
-            routePath={routeResult?.path || null}
-            roadRouteCoords={roadRoute?.coordinates || null}
-            roadRouteSafety={roadRoute?.safetyStatus}
-            routeFromId={routeFromId}
-            routeToId={routeToId}
-            isShelterDestination={navMode === "evacuate"}
-            layerOptions={layerOptions}
-            selectedTileId={selectedTileId}
-            selectedTileIds={selectedTileIds}
-            pulseTileId={pulseTileId}
-            highlightShelterId={highlightShelterId}
-            showPredicted={showPredicted}
-            onlyHighCritical={onlyHighCritical}
-            showReports={showReportsFilter}
-            userPos={userPos}
-            focus={focus}
-            pickMode={pickMode}
-            onTileClick={handleTileClick}
-            onShelterClick={handleShelterClick}
-            onViewportChange={setViewportTileIds}
-          />
-
-          {/* Map Layer Controls (Feature 5 & 10: Toggle Technical Grid, Roads, Closures, Shelters) */}
-          <MapLayerControls
-            options={layerOptions}
-            onChange={setLayerOptions}
-            isAdmin={mode === "authority"}
-          />
-
-          {/* Floating Map Controls (Top Left of Map Area - Avoids top-right Map Layers icon) */}
-          <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 sm:gap-2 max-w-[calc(100vw-64px)] sm:max-w-none pointer-events-auto">
-            {/* Quick Corridor Jump Pills */}
-            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs no-scrollbar">
-              <span className="hidden sm:inline text-[11px] font-bold text-slate-400 uppercase shrink-0">
-                Jump:
-              </span>
-              <Compass className="sm:hidden h-3.5 w-3.5 text-slate-400 shrink-0" />
-              {ZONES.map((z) => (
-                <button
-                  type="button"
-                  key={z.key}
-                  onClick={() => handleJumpToZone(z.key)}
-                  className="px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors shrink-0"
-                >
-                  {z.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Map Filter Controls (Icon-only on mobile to prevent overlapping) */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* 3-Hour Predictive Toggle */}
-              <div
-                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs shrink-0"
-                title="3-Hour Predictive Risk Forecast"
-              >
-                <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
-                <label
-                  htmlFor="pred-toggle"
-                  className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer select-none"
-                >
-                  3h Predictive Risk
-                </label>
-                <Switch
-                  id="pred-toggle"
-                  checked={showPredicted}
-                  onCheckedChange={setShowPredicted}
-                  className="scale-75 sm:scale-90"
-                  aria-label="3-Hour Predictive Risk Forecast"
-                />
-              </div>
-
-              {/* Filter: Only High/Critical */}
-              <button
-                type="button"
-                onClick={() => setOnlyHighCritical(!onlyHighCritical)}
-                className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold shadow-md backdrop-blur-md transition-all shrink-0 ${
-                  onlyHighCritical
-                    ? "bg-red-600 text-white border-red-600"
-                    : "bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
-                }`}
-                title="Filter Severe (High & Critical) Flooding Only"
-                aria-label="Filter Severe Flooding Only"
-              >
-                <ShieldAlert className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Severe Only</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Floating Bottom Action Buttons (Hidden when mobile bottom sheet is active) */}
-          {!mobileSheetOpen && (
-            <>
-              {/* Desktop Spacious Dock (sm+) */}
-              <div className="hidden sm:flex absolute bottom-4 left-4 z-20 items-center gap-2.5 pointer-events-auto">
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={() => setReportDialogOpen(true)}
-                  className="h-11 px-5 rounded-full font-bold shadow-xl gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm"
-                >
-                  <Plus className="h-5 w-5 stroke-[2.5]" />
-                  <span>Report Flooding</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  size="lg"
-                  variant="outline"
-                  onClick={() => {
-                    setRoutePanelOpen(!routePanelOpen);
-                    setMobileSheetOpen(true);
-                  }}
-                  className="h-11 px-4 rounded-full font-bold shadow-xl gap-1.5 text-sm border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 hover:bg-slate-50"
-                >
-                  <Navigation className="h-4 w-4 text-indigo-600" />
-                  <span>Safe Route</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={handleLocateMe}
-                  className="h-11 w-11 rounded-full shadow-xl bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 hover:bg-slate-50 text-slate-800 dark:text-slate-200"
-                  title="Center on my location"
-                >
-                  <LocateFixed className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Mobile Compact Icon-Only Dock (< sm: Clean icons, no overlapping) */}
-              <div className="sm:hidden absolute bottom-3 left-3 z-20 flex items-center gap-2 pointer-events-auto">
-                <Button
-                  type="button"
-                  size="icon"
-                  onClick={() => setReportDialogOpen(true)}
-                  className="h-10 w-10 rounded-full font-bold shadow-xl bg-sky-600 hover:bg-sky-700 text-white shrink-0"
-                  title="Report Flooding"
-                  aria-label="Report Flooding"
-                >
-                  <Plus className="h-5 w-5 stroke-[2.5]" />
-                </Button>
-
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() => {
-                    setRoutePanelOpen(!routePanelOpen);
-                    setMobileSheetOpen(true);
-                  }}
-                  className="h-10 w-10 rounded-full font-bold shadow-xl border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 text-indigo-600 hover:bg-slate-50 shrink-0"
-                  title="Safe Evacuation Route"
-                  aria-label="Safe Evacuation Route"
-                >
-                  <Navigation className="h-5 w-5" />
-                </Button>
-
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={handleLocateMe}
-                  className="h-10 w-10 rounded-full shadow-xl bg-white/95 dark:bg-slate-900/95 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 shrink-0"
-                  title="Center on my location"
-                  aria-label="Center on my location"
-                >
-                  <LocateFixed className="h-4 w-4" />
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Map Legend (Bottom Right - Hidden on mobile if bottom sheet is open) */}
-          {!mobileSheetOpen && <MapLegend />}
-
-          {/* MOBILE BOTTOM SHEET & BACKDROP (Screens < lg) */}
-          {mobileSheetOpen && (
-            <>
-              <div
-                className="lg:hidden absolute inset-0 bg-black/25 z-25 backdrop-blur-[1px] animate-in fade-in duration-150"
-                onClick={() => setMobileSheetOpen(false)}
-                title="Tap to dismiss"
-              />
-              <div className="lg:hidden absolute inset-x-0 bottom-0 max-h-[75vh] z-30 flex flex-col rounded-t-2xl border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
-                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 shrink-0" />
-                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                  {mode === "authority" ? (
-                    <AuthorityDashboard
-                      state={effectiveState}
-                      tiles={tiles}
-                      onFocusTile={(id) => {
-                        const t = tiles.find((x) => x.id === id);
-                        if (t) {
-                          setFocus({
-                            lat: t.centerLat,
-                            lng: t.centerLng,
-                            zoom: 17,
-                            key: Date.now(),
-                          });
-                          setSelectedTileId(id);
-                          setSelectedTileIds(new Set([id]));
-                        }
-                        setMobileSheetOpen(false);
-                      }}
-                      onOpenSimulation={() => setSimDrawerOpen(true)}
-                      onClose={() => setMobileSheetOpen(false)}
-                    />
-                  ) : routePanelOpen ? (
-                    <RoutePanel
-                      tiles={tiles}
-                      shelters={SHELTERS}
-                      reports={effectiveState.reports}
-                      incidents={effectiveState.incidents}
-                      roadRoute={roadRoute}
-                      shelterCandidates={shelterCandidates}
-                      selectedShelterId={selectedShelterId}
-                      fromId={routeFromId}
-                      toId={routeToId}
-                      navMode={navMode}
-                      pickMode={pickMode}
-                      isLoading={isRoutingLoading}
-                      onNavModeChange={setNavMode}
-                      onSelectFrom={setRouteFromId}
-                      onSelectTo={setRouteToId}
-                      onSelectShelter={(sId) => {
-                        setSelectedShelterId(sId);
-                        handleEvacuateToShelter(routeFromId || "t_2_4", sId);
-                      }}
-                      onCalculateRoadRoute={handleCalculateRoadRoute}
-                      onEvacuateToShelter={handleEvacuateToShelter}
-                      onClearRoute={() => {
-                        setRoadRoute(null);
-                        setRouteResult(null);
-                      }}
-                      onTogglePickMode={() => setPickMode(!pickMode)}
-                      onClose={() => {
-                        setRoutePanelOpen(false);
-                        setMobileSheetOpen(false);
-                      }}
-                      onOpenPreparedness={() => setPrepModalOpen(true)}
-                    />
-                  ) : selectedTile ? (
-                    <TileDetailsSheet
-                      tile={selectedTile}
-                      reports={effectiveState.reports}
-                      incident={selectedIncident}
-                      onClose={() => {
-                        setSelectedTileId(null);
-                        setMobileSheetOpen(false);
-                      }}
-                      onReportHere={(id) => {
-                        setSelectedTileId(id);
-                        setReportDialogOpen(true);
-                      }}
-                      onRouteFrom={(id) => {
-                        setRouteFromId(id);
-                        setRoutePanelOpen(true);
-                        if (routeToId) handleCalculateRoute(id, routeToId);
-                      }}
-                      onRouteTo={(id) => {
-                        setRouteToId(id);
-                        setRoutePanelOpen(true);
-                        if (routeFromId) handleCalculateRoute(routeFromId, id);
-                      }}
-                      onOpenPreparedness={() => setPrepModalOpen(true)}
-                    />
-                  ) : (
-                    <CorridorOverview
-                      tiles={tiles}
-                      state={effectiveState}
-                      alerts={allAlerts}
-                      onSelectZone={(z) => {
-                        handleJumpToZone(z);
-                        setMobileSheetOpen(false);
-                      }}
-                      onOpenReport={() => setReportDialogOpen(true)}
-                      onOpenRoute={() => setRoutePanelOpen(true)}
-                      onOpenPreparedness={() => setPrepModalOpen(true)}
-                      onClose={() => setMobileSheetOpen(false)}
-                    />
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </main>
+      {/* 2. FULLSCREEN MAP */}
+      <div className="absolute inset-0 z-0">
+        <FloodMap
+          tiles={dynamicTiles}
+          reports={liveReports}
+          incidents={liveIncidents}
+          shelters={shelters}
+          alertTileIds={new Set()}
+          userPos={userPos}
+          focus={focus}
+          selectedTileId={selectedTileId}
+          roadRouteCoords={roadRoute?.coordinates}
+          roadRouteSafety={roadRoute?.safetyStatus}
+          showPredicted={true}
+          onTileClick={(tid, lat, lng) => {
+            setSelectedTileId(tid);
+          }}
+          onShelterClick={(shId) => {
+            const sh = shelters.find((s) => s.id === shId);
+            if (sh) handlePlanRouteToShelter(sh);
+          }}
+          onBoundsChange={(b) => setViewportBounds(b)}
+        />
       </div>
 
-      {/* 4. MODALS & DRAWERS (All portalled to document.body with z-[10000]) */}
-      <ReportDialog
-        open={reportDialogOpen}
-        preselectedTileId={selectedTileId}
-        tiles={tiles}
-        onClose={() => setReportDialogOpen(false)}
-        onReportSubmitted={(tileId) => {
-          setSelectedTileId(tileId);
-          setSelectedTileIds(new Set([tileId]));
-          setPulseTileId(tileId);
-          const t = tiles.find((x) => x.id === tileId);
-          if (t) {
-            setFocus({ lat: t.centerLat, lng: t.centerLng, zoom: 17, key: Date.now() });
+      {/* 3. PERSISTENT 3-SNAP BOTTOM SHEET (PEEK / HALF / FULL) */}
+      <ProductionBottomSheet
+        currentTile={currentTile}
+        weather={weather}
+        nearestShelter={nearestShelter}
+        roadRoute={roadRoute}
+        onPlanRouteToShelter={handlePlanRouteToShelter}
+        onOpenReportModal={() => setReportModalOpen(true)}
+        onClearRoute={() => setRoadRoute(null)}
+      />
+
+      {/* 4. BOTTOM 4-TAB NAVIGATION DOCK */}
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          if (tab === "map") {
+            setRoadRoute(null);
           }
         }}
+        alertCount={liveAlerts.length}
+        onOpenReport={() => setReportModalOpen(true)}
+        onOpenAlerts={() => setAlertsDrawerOpen(true)}
+        onOpenHelp={() => setHelpModalOpen(true)}
+      />
+
+      {/* 5. MODALS & DRAWERS */}
+      <ThreeTapReportModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        userCoords={userPos}
+        onReportCreated={handleReportCreated}
+      />
+
+      <AuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        currentUser={currentUser}
+        onUserChange={refreshAuth}
+        demoMode={demoMode}
+        onToggleDemoMode={(val) => setDemoMode(val)}
+      />
+
+      <EmergencyHelpModal
+        open={helpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
+      />
+
+      <ControlRoomModal
+        open={controlRoomOpen}
+        onClose={() => setControlRoomOpen(false)}
+        currentUser={currentUser}
+        reports={liveReports}
+        incidents={liveIncidents}
+        alerts={liveAlerts}
+        mapCenter={userPos}
+        onVerifyReport={handleVerifyReport}
+        onDismissReport={handleDismissReport}
+        onAddIncident={handleAddIncident}
+        onAddAlert={handleAddAlert}
       />
 
       <AlertsDrawer
         open={alertsDrawerOpen}
-        alerts={allAlerts}
-        tiles={tiles}
-        viewportTileIds={viewportTileIds}
+        alerts={liveAlerts}
+        tiles={dynamicTiles}
+        viewportTileIds={new Set(dynamicTiles.map((t) => t.id))}
         onClose={() => setAlertsDrawerOpen(false)}
-        onSelectAlertTiles={(tileIds) => {
-          setSelectedTileIds(new Set(tileIds));
-          if (tileIds.length > 0) {
-            const first = tiles.find((t) => t.id === tileIds[0]);
-            if (first) {
-              setFocus({ lat: first.centerLat, lng: first.centerLng, zoom: 16, key: Date.now() });
-              setSelectedTileId(first.id);
-            }
-          }
+        onSelectAlertTiles={(tids) => {
+          if (tids.length > 0) setSelectedTileId(tids[0]);
         }}
-        onOpenPreparedness={() => setPrepModalOpen(true)}
-      />
-
-      <PreparednessModal
-        open={prepModalOpen}
-        state={effectiveState}
-        selectedTile={selectedTile}
-        onClose={() => setPrepModalOpen(false)}
-        onHighlightShelter={(shelterId) => {
-          setHighlightShelterId(shelterId);
-          const sh = SHELTERS.find((s) => s.id === shelterId);
-          if (sh) {
-            setFocus({ lat: sh.lat, lng: sh.lng, zoom: 17, key: Date.now() });
-          }
+        onOpenPreparedness={() => {
+          setAlertsDrawerOpen(false);
+          setHelpModalOpen(true);
         }}
-      />
-
-      <SimulationDrawer
-        open={simDrawerOpen}
-        state={effectiveState}
-        onClose={() => setSimDrawerOpen(false)}
       />
     </div>
   );
