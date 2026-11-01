@@ -169,6 +169,14 @@ export function evaluateRouteRisk(
 
   const tileMap = new Map<string, Tile>(tiles.map((t) => [t.id, t]));
   const activeReports = reports.filter((r) => r.status !== "Dismissed");
+  const modeLimits: Record<EvacuationMode, { depthCm: number; blockedRisks: RiskLevel[] }> = {
+    pedestrian: { depthCm: 20, blockedRisks: ["Critical"] },
+    twowheeler: { depthCm: 12, blockedRisks: ["High", "Critical"] },
+    car: { depthCm: 25, blockedRisks: ["High", "Critical"] },
+    heavyRescue: { depthCm: 55, blockedRisks: [] },
+  };
+  const depthCm: Record<string, number> = { Footpath: 5, Ankles: 10, Knees: 20, WaistPlus: 40 };
+  let clearanceExceeded = false;
 
   // Check every coordinate point along the road geometry
   for (let i = 0; i < coords.length; i++) {
@@ -207,6 +215,7 @@ export function evaluateRouteRisk(
             `Waterlogging (${rep.status}): Knee-deep water reported nearby (${rep.description.slice(0, 40)}...)`,
           );
         }
+        if ((depthCm[rep.severityUser] ?? 0) > modeLimits[mode].depthCm) clearanceExceeded = true;
       }
     }
 
@@ -234,7 +243,10 @@ export function evaluateRouteRisk(
   };
   const allowedRisk = limits[mode].maxRisk;
   const riskRank: Record<RiskLevel, number> = { Low: 0, Moderate: 1, High: 2, Critical: 3 };
-  const exceedsMode = riskRank[counts.Critical > 0 ? "Critical" : counts.High > 0 ? "High" : counts.Moderate > 0 ? "Moderate" : "Low"] > riskRank[allowedRisk];
+  const exceedsMode =
+    clearanceExceeded ||
+    modeLimits[mode].blockedRisks.some((risk) => counts[risk] > 0) ||
+    riskRank[counts.Critical > 0 ? "Critical" : counts.High > 0 ? "High" : counts.Moderate > 0 ? "Moderate" : "Low"] > riskRank[allowedRisk];
 
   if (blockedByClosure || (exceedsMode && mode !== "heavyRescue")) {
     return {
@@ -249,7 +261,7 @@ export function evaluateRouteRisk(
     };
   }
 
-  if (counts.Critical > 0 || uniqueWarnings.some((w) => w.includes("Waist-deep"))) {
+  if ((counts.Critical > 0 || uniqueWarnings.some((w) => w.includes("Waist-deep"))) && mode !== "heavyRescue") {
     return {
       safetyStatus: "Impassable",
       safetyScore: 10,
@@ -302,8 +314,10 @@ export async function fetchOsrmRoute(
   tiles: Tile[],
   reports: FloodReport[],
   incidents: RoadIncident[],
+  mode: EvacuationMode = "car",
 ): Promise<RoadRouteResult | null> {
-  const url = `${OSRM_API_BASE}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+  const profile = mode === "pedestrian" ? "foot" : "driving";
+  const url = `https://router.project-osrm.org/route/v1/${profile}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 6500);
@@ -349,7 +363,7 @@ export async function fetchOsrmRoute(
       }
 
       // Evaluate flood & closure risk on this candidate's coordinates
-      const riskEval = evaluateRouteRisk(coords, tiles, reports, incidents);
+      const riskEval = evaluateRouteRisk(coords, tiles, reports, incidents, mode);
 
       candidates.push({
         coordinates: coords,
@@ -402,6 +416,7 @@ export function getCorridorFallbackRoute(
   tiles: Tile[],
   reports: FloodReport[],
   incidents: RoadIncident[],
+  mode: EvacuationMode = "car",
 ): RoadRouteResult {
   // Find nearest intersection in graph to start and end
   let startNodeKey = "sionHospital";
@@ -432,24 +447,33 @@ export function getCorridorFallbackRoute(
     adj.get(c.to)?.push({ target: c.from, points: [...c.points].reverse(), name: c.name });
   }
 
-  // BFS shortest path on road corridor network
-  const queue: { node: string; path: { points: [number, number][]; name: string }[] }[] = [
-    { node: startNodeKey, path: [] },
+  // Offline A* over the mapped road graph. Edge cost is geodesic distance and
+  // the heuristic is straight-line distance to the destination node.
+  const queue: { node: string; path: { points: [number, number][]; name: string }[]; cost: number; score: number }[] = [
+    { node: startNodeKey, path: [], cost: 0, score: 0 },
   ];
-  const visited = new Set<string>([startNodeKey]);
+  const bestCost = new Map<string, number>([[startNodeKey, 0]]);
   let foundPath: { points: [number, number][]; name: string }[] | null = null;
 
   while (queue.length > 0) {
+    queue.sort((a, b) => a.score - b.score);
     const cur = queue.shift()!;
     if (cur.node === endNodeKey) {
       foundPath = cur.path;
       break;
     }
     for (const edge of adj.get(cur.node) || []) {
-      if (!visited.has(edge.target)) {
-        visited.add(edge.target);
-        queue.push({ node: edge.target, path: [...cur.path, edge] });
-      }
+      const points = edge.points;
+      const edgeCost = points.reduce(
+        (total, point, index) => index === 0 ? total : total + distanceKm(points[index - 1][0], points[index - 1][1], point[0], point[1]),
+        0,
+      );
+      const nextCost = cur.cost + edgeCost;
+      if (nextCost >= (bestCost.get(edge.target) ?? Infinity)) continue;
+      bestCost.set(edge.target, nextCost);
+      const target = intersections[edge.target as keyof typeof intersections];
+      const heuristic = target ? distanceKm(target.lat, target.lng, to.lat, to.lng) : 0;
+      queue.push({ node: edge.target, path: [...cur.path, edge], cost: nextCost, score: nextCost + heuristic });
     }
   }
 
@@ -480,7 +504,7 @@ export function getCorridorFallbackRoute(
 
   const durationMin = Math.max(2, Math.round((distKm / 22) * 60));
 
-  const riskEval = evaluateRouteRisk(cleanPts, tiles, reports, incidents);
+  const riskEval = evaluateRouteRisk(cleanPts, tiles, reports, incidents, mode);
 
   return {
     coordinates: cleanPts,
@@ -527,12 +551,13 @@ export async function calculateRoadRoute(
   tiles: Tile[],
   reports: FloodReport[],
   incidents: RoadIncident[],
+  mode: EvacuationMode = "car",
 ): Promise<RoadRouteResult> {
-  const osrm = await fetchOsrmRoute(from, to, tiles, reports, incidents);
+  const osrm = await fetchOsrmRoute(from, to, tiles, reports, incidents, mode);
   if (osrm) return osrm;
 
   // Use mapped corridor fallback
-  return getCorridorFallbackRoute(from, to, tiles, reports, incidents);
+  return getCorridorFallbackRoute(from, to, tiles, reports, incidents, mode);
 }
 
 /**
