@@ -83,8 +83,7 @@ export default function TileDetailsSheet({
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Block {tile.row + 1}
-              {String.fromCharCode(65 + (tile.col % 26))} • {tile.ward.toUpperCase()} WARD
+              {tile.ward.toUpperCase()} WARD
             </span>
             {tile.isHotspot && (
               <Badge className="bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800 text-[11px] font-bold px-2 py-0">
@@ -238,8 +237,7 @@ export default function TileDetailsSheet({
             </ul>
           </div>
           <p className="text-[11px] text-slate-500 italic pt-1 border-t border-amber-200 dark:border-amber-800/60">
-            Simulated rule-based prediction for demonstration. Not for life-safety emergency
-            decisions.
+            Rule-based early warning advisory. Confirm conditions with current BMC/MCGM notices before travel.
           </p>
         </div>
 
@@ -335,7 +333,7 @@ export default function TileDetailsSheet({
                     {r.description}
                   </p>
                   <div className="text-[10px] text-slate-400 text-right">
-                    {timeAgo(r.createdAt, Date.now())}
+                    {new Date(r.createdAt).toLocaleString()} • {timeAgo(r.createdAt, Date.now())}
                   </div>
                 </div>
               ))}

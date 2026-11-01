@@ -36,6 +36,8 @@ interface ProductionBottomSheetProps {
   onOpenAlerts?: () => void;
   onOpenHelp?: () => void;
   alertCount?: number;
+  reports?: import("@/lib/flood/types").FloodReport[];
+  offlineQueuedCount?: number;
   evacuationMode?: EvacuationMode;
   onEvacuationModeChange?: (mode: EvacuationMode) => void;
 }
@@ -53,6 +55,8 @@ export default function ProductionBottomSheet({
   alertCount = 0,
   evacuationMode = "car",
   onEvacuationModeChange,
+  reports = [],
+  offlineQueuedCount = 0,
 }: ProductionBottomSheetProps) {
   const t = useI18n();
   // Mobile snap heights: 0 = peek (56px), 1 = half (360px), 2 = full (80vh)
@@ -61,6 +65,7 @@ export default function ProductionBottomSheet({
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [showTechnicalMath, setShowTechnicalMath] = useState(false);
   const [audioGuidance, setAudioGuidance] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   const score = currentTile?.currentSeverityScore ?? 0;
   const closure = currentTile?.closure;
@@ -74,6 +79,7 @@ export default function ProductionBottomSheet({
   const openGoogleMapsRoute = () => {
     if (!roadRoute || roadRoute.coordinates.length < 2) return;
     const dest = roadRoute.coordinates[roadRoute.coordinates.length - 1];
+    if (!dest) return;
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest[0]},${dest[1]}`, "_blank");
   };
 
@@ -116,6 +122,11 @@ export default function ProductionBottomSheet({
                 {currentTile?.ward ? `${currentTile.ward} • ${civicStatus.headline}` : civicStatus.headline}
               </p>
             </div>
+            {typeof navigator !== "undefined" && !navigator.onLine && (
+              <div className="mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                Offline Mode • Queued {offlineQueuedCount || 1} report{offlineQueuedCount === 1 ? "" : "s"} for upload
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -317,7 +328,35 @@ export default function ProductionBottomSheet({
                     {nearestShelter.distanceLabel}
                   </Badge>
                 )}
+
+                {currentTile && reports.filter((report) => report.tileId === currentTile.id && report.photoUrl).length > 0 && (
+                  <div className="rounded-2xl border border-border/80 bg-muted/30 p-3 space-y-2">
+                    <p className="text-[11px] font-bold text-foreground">Citizen report evidence</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {reports.filter((report) => report.tileId === currentTile.id && report.photoUrl).map((report) => (
+                        <button
+                          type="button"
+                          key={report.id}
+                          onClick={() => setSelectedPhoto(report.photoUrl || null)}
+                          className="relative aspect-square overflow-hidden rounded-lg border border-border"
+                          aria-label={`View ${report.status.toLowerCase()} flood report photo from ${new Date(report.createdAt).toLocaleString()}`}
+                        >
+                          <img src={report.photoUrl} alt="Citizen flood report" className="h-full w-full object-cover" />
+                          <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[9px] font-bold text-white">
+                            {report.status === "Verified" ? "✓ Verified" : report.severityUser}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+              {selectedPhoto && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true">
+                  <button type="button" className="absolute inset-0 cursor-default" aria-label="Close photo preview" onClick={() => setSelectedPhoto(null)} />
+                  <img src={selectedPhoto} alt="Flood report evidence enlarged" className="relative max-h-[85vh] max-w-full rounded-xl object-contain" />
+                </div>
+              )}
               <p className="font-bold text-foreground text-xs truncate mt-1">
                 {nearestShelter.name}
               </p>

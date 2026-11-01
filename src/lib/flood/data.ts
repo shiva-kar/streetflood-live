@@ -208,7 +208,6 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 18),
       status: "Verified",
       reviewedAt: ago(now, 10),
-      photoUrl: `${import.meta.env.BASE_URL}images/demo-flood-1.jpg`,
     },
     {
       id: "r2",
@@ -240,7 +239,6 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 12),
       status: "Verified",
       reviewedAt: ago(now, 6),
-      photoUrl: `${import.meta.env.BASE_URL}images/demo-flood-2.jpg`,
     },
     {
       id: "r5",
