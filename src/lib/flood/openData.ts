@@ -295,11 +295,83 @@ out center 30;
         setCached(cacheKey, shelters);
         return shelters;
       }
+
     } catch (e) {
       console.warn("Overpass endpoint failed, trying next:", e);
     }
   }
 
+  return [];
+}
+
+/**
+ * Loads publicly mapped emergency assembly points and shelters across India.
+ * The query is intentionally limited to shelter-specific OSM tags so ordinary
+ * schools and hospitals do not become false evacuation destinations.
+ */
+export async function fetchIndiaShelters(): Promise<Shelter[]> {
+  const cacheKey = "india_shelters_osm_v2";
+  const cached = getCached<Shelter[]>(cacheKey, 24 * 60 * 60 * 1000);
+  if (cached) return cached;
+
+  const query = `
+[out:json][timeout:30];
+(
+  nwr["amenity"="shelter"](6.5,68,35.7,97.5);
+  nwr["emergency"="assembly_point"](6.5,68,35.7,97.5);
+  nwr["social_facility"="shelter"](6.5,68,35.7,97.5);
+);
+out center 5000;
+`;
+
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const shelters: Shelter[] = (json.elements || [])
+        .map((el: {
+          id: number;
+          type?: string;
+          lat?: number;
+          lon?: number;
+          center?: { lat: number; lon: number };
+          tags?: Record<string, string>;
+        }) => {
+          const lat = el.lat ?? el.center?.lat;
+          const lng = el.lon ?? el.center?.lon;
+          if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          const tags = el.tags || {};
+          const name =
+            tags["name:en"] ||
+            tags.name ||
+            tags["official_name:en"] ||
+            "Public emergency assembly point";
+          const locality = [tags["addr:city"], tags["addr:district"], tags["addr:state"]]
+            .filter(Boolean)
+            .join(", ");
+          return {
+            id: `osm_india_shelter_${el.type || "element"}_${el.id}`,
+            name,
+            address: locality || "India · OpenStreetMap emergency location",
+            lat,
+            lng,
+            kind: "Community Hall" as const,
+            capacityStatus: "Space available" as const,
+            provenance: "OpenStreetMap Public Data" as const,
+            accessibilityNote:
+              tags.wheelchair === "yes" ? "Wheelchair access mapped in OpenStreetMap." : undefined,
+            wheelchairAccessible: tags.wheelchair === "yes",
+            drinkingWater: tags.drinking_water === "yes",
+          } satisfies Shelter;
+        })
+        .filter((s: Shelter | null): s is Shelter => s !== null);
+      setCached(cacheKey, shelters);
+      return shelters;
+    } catch {
+      // Try the next public Overpass mirror.
+    }
+  }
   return [];
 }
 

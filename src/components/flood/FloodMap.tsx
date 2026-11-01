@@ -19,6 +19,7 @@ export interface ViewportBounds {
   east: number;
   centerLat: number;
   centerLng: number;
+  zoom: number;
 }
 
 export interface FloodMapProps {
@@ -160,6 +161,7 @@ export default function FloodMap(props: FloodMapProps) {
         east: b.getEast(),
         centerLat: center.lat,
         centerLng: center.lng,
+        zoom: m.getZoom(),
       });
     };
 

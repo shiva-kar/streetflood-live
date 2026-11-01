@@ -87,7 +87,7 @@ export interface Shelter {
   lng: number;
   kind: "School" | "Community Hall" | "Municipal Building";
   capacityStatus: "Space available" | "Filling up" | "Near capacity";
-  provenance?: "Official Verified" | "Community Reported" | "Simulated Demo";
+  provenance?: "Official Verified" | "Community Reported" | "OpenStreetMap Public Data" | "Simulated Demo";
   accessibilityNote?: string;
   ward?: string;
   contactPhone?: string;

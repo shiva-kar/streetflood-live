@@ -15,6 +15,7 @@ import type { MapLayerOptions } from "@/lib/flood/types";
 import {
   fetchRealWeather,
   fetchOsmShelters,
+  fetchIndiaShelters,
   getCurrentUserGps,
   calculateWorldwideSafeRoute,
   type RealWeatherResult,
@@ -70,6 +71,7 @@ export default function StreetFloodApp() {
     east: MAP_CENTER[1] + 0.02,
     centerLat: MAP_CENTER[0],
     centerLng: MAP_CENTER[1],
+    zoom: 15,
   });
 
   // Real Data: Weather, Shelters, Reports, Incidents, Alerts
@@ -220,12 +222,37 @@ export default function StreetFloodApp() {
     });
   }, [viewportBounds, weather]);
 
+  useEffect(() => {
+    if (viewportBounds.zoom > 7 && viewportBounds.north - viewportBounds.south <= 1.5) return;
+    let cancelled = false;
+    fetchIndiaShelters().then((indiaShelters) => {
+      if (cancelled || indiaShelters.length === 0) return;
+      setShelters((prev) => {
+        const ids = new Set(indiaShelters.map((s) => s.id));
+        return [...indiaShelters, ...prev.filter((s) => !ids.has(s.id))];
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewportBounds.zoom, viewportBounds.north, viewportBounds.south]);
+
   // 6. Dynamic Grid Tile Generation (Worldwide)
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
+
+  const activeAlerts = useMemo(
+    () =>
+      liveAlerts.filter(
+        (alert) =>
+          alert.status === "Published" &&
+          now - new Date(alert.createdAt).getTime() <= 6 * 60 * 60 * 1000,
+      ),
+    [liveAlerts, now],
+  );
 
   const dynamicTiles = useMemo(() => {
     return generateViewportTiles(
@@ -414,8 +441,8 @@ export default function StreetFloodApp() {
         demoMode={demoMode}
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenHelp={() => setHelpModalOpen(true)}
-        alertCount={liveAlerts.length}
-        criticalAlert={liveAlerts.find((alert) => alert.severity === "Critical")?.message}
+        alertCount={activeAlerts.length}
+        criticalAlert={activeAlerts.find((alert) => alert.severity === "Critical")?.message}
         reports={liveReports}
         offlineQueuedCount={offlineQueuedCount}
       />
@@ -467,7 +494,7 @@ export default function StreetFloodApp() {
         onClearRoute={() => setRoadRoute(null)}
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenHelp={() => setHelpModalOpen(true)}
-        alertCount={liveAlerts.length}
+        alertCount={activeAlerts.length}
         evacuationMode={evacuationMode}
         onEvacuationModeChange={(mode) => {
           setEvacuationMode(mode);
@@ -484,7 +511,7 @@ export default function StreetFloodApp() {
             setRoadRoute(null);
           }
         }}
-        alertCount={liveAlerts.length}
+        alertCount={activeAlerts.length}
         onOpenReport={() => setReportModalOpen(true)}
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenHelp={() => setHelpModalOpen(true)}
@@ -518,7 +545,7 @@ export default function StreetFloodApp() {
         currentUser={currentUser}
         reports={liveReports}
         incidents={liveIncidents}
-        alerts={liveAlerts}
+        alerts={activeAlerts}
         mapCenter={userPos}
         onVerifyReport={handleVerifyReport}
         onDismissReport={handleDismissReport}
