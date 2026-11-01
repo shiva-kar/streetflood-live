@@ -43,6 +43,9 @@ interface ProductionBottomSheetProps {
   onOpenShelterDetails?: (shelter: Shelter) => void;
   onOpenAllShelters?: () => void;
   sheltersCount?: number;
+  activeCityName?: string;
+  isNationalView?: boolean;
+  onSelectCity?: (city: string, lat: number, lng: number) => void;
 }
 
 export default function ProductionBottomSheet({
@@ -63,6 +66,9 @@ export default function ProductionBottomSheet({
   sheltersCount = 0,
   reports = [],
   offlineQueuedCount = 0,
+  activeCityName,
+  isNationalView = false,
+  onSelectCity,
 }: ProductionBottomSheetProps) {
   const t = useI18n();
   // Mobile snap heights: 0 = peek (56px), 1 = half (360px), 2 = full (80vh)
@@ -134,7 +140,7 @@ export default function ProductionBottomSheet({
             />
             <div className="truncate">
               <h3 className="text-xs sm:text-sm font-bold text-foreground truncate">
-                {currentTile?.locality || "Sion–Kurla Corridor"}
+                {currentTile?.locality || activeCityName || "Monitored Region"}
               </h3>
               <p className="text-[11px] text-muted-foreground truncate">
                 {currentTile?.ward ? `${currentTile.ward} • ${civicStatus.headline}` : civicStatus.headline}
@@ -197,13 +203,17 @@ export default function ProductionBottomSheet({
           variant="outline"
           size="sm"
           onClick={() => {
-            if (nearestShelter) onPlanRouteToShelter(nearestShelter);
+            if (nearestShelter && (!nearestShelter.distanceKm || nearestShelter.distanceKm <= 75)) {
+              onPlanRouteToShelter(nearestShelter);
+            } else if (onOpenAllShelters) {
+              onOpenAllShelters();
+            }
           }}
-          disabled={!nearestShelter}
+          disabled={!nearestShelter && !onOpenAllShelters}
           className="h-9 text-xs font-semibold gap-1.5 rounded-xl border-border hover:bg-muted cursor-pointer"
         >
           <Navigation className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>{t.safeRoute}</span>
+          <span>{nearestShelter && (!nearestShelter.distanceKm || nearestShelter.distanceKm <= 75) ? t.safeRoute : "Find Shelters"}</span>
         </Button>
       </div>
 
@@ -236,13 +246,17 @@ export default function ProductionBottomSheet({
 
         <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between">
           <div>
-            <p className="font-semibold text-foreground">Tide & Drainage Indicator</p>
+            <p className="font-semibold text-foreground">
+              {isNationalView ? "National Drainage & River Basin Flow" : "Drainage & Flow Indicator"}
+            </p>
             <p className="text-[11px] text-muted-foreground">
-              {tide.warningLevel === "Normal" ? "Normal tide" : tide.warningLevel}: {tide.heightMeters.toFixed(2)} m • {tide.trend}
+              {isNationalView
+                ? "Active municipal stormwater pumps and river catchment discharge monitored."
+                : `${tide.warningLevel === "Normal" ? "Normal discharge flow" : tide.warningLevel}: water level within drainage thresholds`}
             </p>
           </div>
           <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
-            {tide.heightMeters > 4.2 ? "Low drainage discharge" : "Drainage operating"}
+            Drainage operating
           </span>
         </div>
 
@@ -330,70 +344,146 @@ export default function ProductionBottomSheet({
           </div>
         )}
 
-        {/* 3. NEAREST VERIFIED EMERGENCY SHELTER */}
+        {/* 3. VERIFIED EMERGENCY SHELTERS */}
         {nearestShelter && !roadRoute && (
-          <div className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 space-y-2 shadow-xs">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-primary tracking-wider">
-                  {t.nearestShelter}
-                </span>
-                {nearestShelter.distanceLabel && (
-                  <Badge
-                    variant="secondary"
-                    className="text-[9px] px-1.5 py-0 h-4 font-bold bg-primary/10 text-primary border-none"
-                  >
-                    {nearestShelter.distanceLabel}
+          (isNationalView || (nearestShelter.distanceKm != null && nearestShelter.distanceKm > 75)) ? (
+            <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                    Emergency Relief Shelters
+                  </span>
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-bold bg-primary/10 text-primary border-none">
+                    National Network
                   </Badge>
+                </div>
+                {onOpenAllShelters && (
+                  <button
+                    type="button"
+                    onClick={onOpenAllShelters}
+                    className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    Directory ({sheltersCount > 0 ? sheltersCount : "All"})
+                  </button>
                 )}
               </div>
-              {onOpenAllShelters && (
-                <button
-                  type="button"
-                  onClick={onOpenAllShelters}
-                  className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
-                >
-                  View All ({sheltersCount > 0 ? sheltersCount : "Directory"})
-                </button>
-              )}
-            </div>
 
-            <div>
-              <p className="font-bold text-foreground text-xs truncate">
-                {nearestShelter.name}
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Zoom into any district or select a region below to view neighborhood shelters and live safe routes.
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {nearestShelter.address} • {nearestShelter.capacityStatus}
-              </p>
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {nearestShelter.drinkingWater && <Badge variant="secondary" className="text-[9px]">💧 Water</Badge>}
-                {nearestShelter.medicalAid && <Badge variant="secondary" className="text-[9px]">🏥 First Aid</Badge>}
-                {nearestShelter.wheelchairAccessible && <Badge variant="secondary" className="text-[9px]">♿ Accessible</Badge>}
-                {nearestShelter.petFriendly && <Badge variant="secondary" className="text-[9px]">🐕 Pet Friendly</Badge>}
+
+              {/* REGIONAL QUICK HUBS */}
+              {onSelectCity && (
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {[
+                    { city: "Delhi", lat: 28.6139, lng: 77.2090 },
+                    { city: "Mumbai", lat: 19.0760, lng: 72.8777 },
+                    { city: "Bengaluru", lat: 12.9716, lng: 77.5946 },
+                    { city: "Kolkata", lat: 22.5726, lng: 88.3639 },
+                    { city: "Guwahati", lat: 26.1445, lng: 91.7362 },
+                    { city: "Odisha", lat: 20.2961, lng: 85.8245 },
+                    { city: "Chennai", lat: 13.0827, lng: 80.2707 },
+                    { city: "Hyderabad", lat: 17.3850, lng: 78.4867 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.city}
+                      type="button"
+                      onClick={() => onSelectCity(preset.city, preset.lat, preset.lng)}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-background border border-border/80 hover:bg-primary/10 hover:border-primary/40 text-foreground transition-colors cursor-pointer"
+                    >
+                      {preset.city}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1 border-t border-border/60">
+                {onOpenAllShelters && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onOpenAllShelters}
+                    className="h-8 text-xs flex-1 font-semibold border-border hover:bg-muted"
+                  >
+                    Browse All Shelters
+                  </Button>
+                )}
+                {onOpenShelterDetails && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => onOpenShelterDetails(nearestShelter)}
+                    className="h-8 text-xs flex-1 font-semibold"
+                  >
+                    View {nearestShelter.name.split(" ")[0]} Hub
+                  </Button>
+                )}
               </div>
             </div>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 space-y-2 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-primary tracking-wider">
+                    {t.nearestShelter}
+                  </span>
+                  {nearestShelter.distanceLabel && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[9px] px-1.5 py-0 h-4 font-bold bg-primary/10 text-primary border-none"
+                    >
+                      {nearestShelter.distanceLabel}
+                    </Badge>
+                  )}
+                </div>
+                {onOpenAllShelters && (
+                  <button
+                    type="button"
+                    onClick={onOpenAllShelters}
+                    className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                  >
+                    View All ({sheltersCount > 0 ? sheltersCount : "Directory"})
+                  </button>
+                )}
+              </div>
 
-            <div className="flex items-center gap-2 pt-1 border-t border-primary/15">
-              {onOpenShelterDetails && (
+              <div>
+                <p className="font-bold text-foreground text-xs truncate">
+                  {nearestShelter.name}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {nearestShelter.address} • {nearestShelter.capacityStatus}
+                </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {nearestShelter.drinkingWater && <Badge variant="secondary" className="text-[9px]">💧 Water</Badge>}
+                  {nearestShelter.medicalAid && <Badge variant="secondary" className="text-[9px]">🏥 First Aid</Badge>}
+                  {nearestShelter.wheelchairAccessible && <Badge variant="secondary" className="text-[9px]">♿ Accessible</Badge>}
+                  {nearestShelter.petFriendly && <Badge variant="secondary" className="text-[9px]">🐕 Pet Friendly</Badge>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-primary/15">
+                {onOpenShelterDetails && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenShelterDetails(nearestShelter)}
+                    className="h-8 text-xs flex-1 border-primary/30 hover:bg-primary/10 font-semibold"
+                  >
+                    Facility Details
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => onOpenShelterDetails(nearestShelter)}
-                  className="h-8 text-xs flex-1 border-primary/30 hover:bg-primary/10 font-semibold"
+                  onClick={() => onPlanRouteToShelter(nearestShelter)}
+                  className="h-8 text-xs flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-sm cursor-pointer"
                 >
-                  Facility Details
+                  <Navigation className="w-3.5 h-3.5" />
+                  {t.directions}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                onClick={() => onPlanRouteToShelter(nearestShelter)}
-                className="h-8 text-xs flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Navigation className="w-3.5 h-3.5" />
-                {t.directions}
-              </Button>
+              </div>
             </div>
-          </div>
+          )
         )}
 
         {/* CITIZEN REPORT EVIDENCE PHOTOS */}

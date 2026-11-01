@@ -66,6 +66,7 @@ export default function FloodMap(props: FloodMapProps) {
   const el = useRef<HTMLDivElement>(null);
   const [L, setL] = useState<typeof LType | null>(null);
   const [currentZoom, setCurrentZoom] = useState(15);
+  const [viewKey, setViewKey] = useState(0);
   const map = useRef<LType.Map | null>(null);
   const rects = useRef(new Map<string, LType.Rectangle>());
   const layers = useRef<Record<string, LType.LayerGroup>>({});
@@ -88,14 +89,17 @@ export default function FloodMap(props: FloodMapProps) {
     const safeCenter: [number, number] =
       center && !isNaN(center[0]) && !isNaN(center[1]) ? center : MAP_CENTER;
 
+    const initialZoom = props.focus?.zoom ?? (safeCenter[0] > 20 && safeCenter[0] < 23 && safeCenter[1] > 77 && safeCenter[1] < 80 ? 5 : 15);
+
     const m = L.map(el.current, {
       center: safeCenter,
-      zoom: 15,
+      zoom: initialZoom,
       minZoom: 3,
       maxZoom: 19,
       zoomControl: false,
       preferCanvas: true,
     });
+    setCurrentZoom(initialZoom);
 
     // Dedicated panes for clean layer stacking
     if (!m.getPane("technicalGridPane")) {
@@ -163,6 +167,8 @@ export default function FloodMap(props: FloodMapProps) {
         centerLng: center.lng,
         zoom: m.getZoom(),
       });
+      setCurrentZoom(m.getZoom());
+      setViewKey((k) => k + 1);
     };
 
     m.on("moveend", emitViewport);
@@ -534,24 +540,27 @@ export default function FloodMap(props: FloodMapProps) {
 
     if (props.layerOptions?.showShelters === false) return;
 
-    // Spatial decimation at overview zooms (< 7) to avoid marker clumps across India while preserving even national distribution
-    const renderedCoords: [number, number][] = [];
-    const minDistanceDegrees = currentZoom < 4.5 ? 2.0 : currentZoom < 6 ? 1.2 : currentZoom < 7.5 ? 0.45 : 0;
+    // Performance & Usability Guard:
+    // Only show shelters when zoomed in to district or city level (currentZoom >= 8).
+    // At national/country zoom (< 8), do not render individual pins so the map never lags.
+    const zoomLevel = map.current ? map.current.getZoom() : currentZoom;
+    if (zoomLevel < 8 && !props.highlightShelterId) {
+      return;
+    }
+
+    const bounds = map.current?.getBounds();
 
     for (const s of props.shelters) {
       if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) continue;
 
       const isHighlighted = props.highlightShelterId === s.id;
 
-      if (!isHighlighted && minDistanceDegrees > 0) {
-        const tooClose = renderedCoords.some(
-          ([rLat, rLng]) => Math.hypot(s.lat - rLat, s.lng - rLng) < minDistanceDegrees,
-        );
-        if (tooClose) continue;
+      // When zoomed in, strictly filter to markers visible in the current viewport bounds
+      if (!isHighlighted && bounds && !bounds.contains([s.lat, s.lng])) {
+        continue;
       }
-      renderedCoords.push([s.lat, s.lng]);
 
-      const size = isHighlighted ? 36 : currentZoom < 6 ? 16 : currentZoom < 9 ? 22 : 26;
+      const size = isHighlighted ? 36 : currentZoom < 10 ? 22 : 26;
       const anchor = size / 2;
 
       const marker = L.marker([s.lat, s.lng], {
@@ -588,7 +597,7 @@ export default function FloodMap(props: FloodMapProps) {
         map.current?.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
       }
     }
-  }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters, currentZoom]);
+  }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters, currentZoom, viewKey]);
 
   // Safe road route polyline
   useEffect(() => {
