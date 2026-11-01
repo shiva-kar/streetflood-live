@@ -1,4 +1,5 @@
 import type { FloodReport, IncidentStatus, RiskLevel, RoadIncident, Tile } from "./types";
+import { SION_KURLA_OSM_ROADS } from "./osmNetwork";
 
 export const CELL_DLAT = 0.0009; // ≈ 100m north-south
 
@@ -82,6 +83,48 @@ export const RECENT_WINDOW_HOURS = 6;
  * Dynamically generates ~100m grid tiles for the current viewport bounding box.
  * Automatically limits tile count to maintain 60 FPS on mobile.
  */
+export function resolveLocalityAndWard(lat: number, lng: number): { locality: string; ward: string } {
+  // Sion–Kurla corridor bounds in Mumbai
+  if (lat >= 19.025 && lat <= 19.085 && lng >= 72.845 && lng <= 72.895) {
+    let closestRoad = "";
+    let minD = 0.0035; // ~350m
+    for (const r of SION_KURLA_OSM_ROADS) {
+      if (!r.name || r.name.startsWith("Unnamed")) continue;
+      const c = r.coordinates[0];
+      const d = Math.hypot(lat - c[0], lng - c[1]);
+      if (d < minD) {
+        minD = d;
+        closestRoad = r.name;
+      }
+    }
+
+    const ward =
+      lat >= 19.055
+        ? "Kurla (L Ward)"
+        : lat <= 19.04
+        ? "Sion (F-North Ward)"
+        : "Chunabhatti / L Ward";
+
+    if (closestRoad) {
+      return { locality: closestRoad, ward };
+    }
+
+    const defaultLocality =
+      lat >= 19.055
+        ? "Kurla West Corridor"
+        : lat <= 19.04
+        ? "Sion Circle Corridor"
+        : "Chunabhatti / SCLR";
+
+    return { locality: defaultLocality, ward };
+  }
+
+  return {
+    locality: "Disaster Response Sector",
+    ward: "Monitored Region",
+  };
+}
+
 export function generateViewportTiles(
   bbox: { south: number; west: number; north: number; east: number },
   reports: FloodReport[],
@@ -206,14 +249,16 @@ export function generateViewportTiles(
       const predictedPressure =
         (recentRainMm > 20 ? 1 : 0) + (forecastRain3hMm > 25 ? 1 : 0) + (finalScore >= 30 ? 1 : 0);
 
+      const { locality, ward } = resolveLocalityAndWard(tileLat, tileLng);
+
       tiles.push({
         id,
         row: r,
         col: c,
         centerLat: tileLat,
         centerLng: tileLng,
-        ward: "Local Area",
-        locality: `Zone ${r},${c}`,
+        ward,
+        locality,
         isHotspot: finalScore >= 40,
         drainageScore: 50,
         rainFactor: 1.0,

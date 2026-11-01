@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Sparkles, Loader2 } from "lucide-react";
+import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Sparkles, Loader2, AlertTriangle, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +21,9 @@ interface ProductionHeaderProps {
   onOpenControlRoom?: () => void;
   canAccessControlRoom: boolean;
   demoMode: boolean;
+  onOpenAlerts?: () => void;
+  onOpenHelp?: () => void;
+  alertCount?: number;
 }
 
 export default function ProductionHeader({
@@ -32,6 +35,9 @@ export default function ProductionHeader({
   onOpenControlRoom,
   canAccessControlRoom,
   demoMode,
+  onOpenAlerts,
+  onOpenHelp,
+  alertCount = 0,
 }: ProductionHeaderProps) {
   const t = useI18n();
   const [query, setQuery] = useState("");
@@ -85,11 +91,9 @@ export default function ProductionHeader({
           <span className="font-bold text-sm tracking-tight text-foreground hidden sm:inline">
             StreetFlood<span className="text-primary font-normal">.Live</span>
           </span>
-          {demoMode && (
-            <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full border border-amber-500/20">
-              Demo Mode
-            </span>
-          )}
+          <span className="text-[10px] text-muted-foreground font-semibold hidden md:inline ml-0.5 border-l border-border/80 pl-2">
+            Mumbai
+          </span>
         </div>
 
         {/* SEARCH BAR (WORLDWIDE OPEN-WORLD SEARCH) */}
@@ -171,7 +175,7 @@ export default function ProductionHeader({
             <Button
               variant="outline"
               size="icon"
-              className="h-10 w-10 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm"
+              className="h-10 w-10 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hidden sm:inline-flex"
             >
               <Globe className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -197,6 +201,37 @@ export default function ProductionHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* ALERTS QUICK-BUTTON (DESKTOP) */}
+        {onOpenAlerts && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenAlerts}
+            className="h-10 px-3 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm gap-1.5 text-xs font-semibold hidden md:inline-flex relative cursor-pointer"
+          >
+            <Bell className="w-4 h-4 text-primary" />
+            <span className="hidden lg:inline">{t.tabAlerts}</span>
+            {alertCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-red-600 text-white font-bold text-[8px] rounded-full">
+                {alertCount}
+              </span>
+            )}
+          </Button>
+        )}
+
+        {/* EMERGENCY 112 DIRECT CALL/HELP (DESKTOP) */}
+        {onOpenHelp && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onOpenHelp}
+            className="h-10 px-3.5 rounded-2xl shrink-0 bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm gap-1.5 hidden sm:inline-flex cursor-pointer"
+          >
+            <AlertTriangle className="w-4 h-4" />
+            <span>112 Help</span>
+          </Button>
+        )}
 
         {/* CONTROL ROOM BUTTON (ONLY IF PERMITTED) */}
         {canAccessControlRoom && onOpenControlRoom && (

@@ -319,27 +319,38 @@ export default function FloodMap(props: FloodMapProps) {
       const evalResult = evaluateOsmRoadRisk(road, tileMap, props.incidents, props.reports);
       const { riskLevel, severityScore, reason } = evalResult;
 
-      // Clean map design: do NOT draw normal/low-risk roads green
-      if (riskLevel === "Low" || riskLevel === "Unassessed") continue;
+      if (riskLevel === "Unassessed") continue;
 
-      let strokeColor = "#eab308";
-      let weight = currentZoom < 15 ? 3.5 : 4.5;
-      let opacity = 0.9;
+      // Clean map hierarchy:
+      // At overview zooms (< 14.5), show major arterial corridors for clear road passability.
+      // Minor residential alleys appear when zooming into street level (>= 14.5).
+      // All hazards (Moderate, High, Critical, Closed) are ALWAYS displayed at any zoom level.
+      if (riskLevel === "Low" && !road.isMajor && currentZoom < 14.5) {
+        continue;
+      }
+
+      let strokeColor = "#10b981";
+      let weight = currentZoom < 15 ? 2.6 : 3.4;
+      let opacity = 0.65;
       let dashArray: string | undefined = undefined;
 
       if (riskLevel === "Closed") {
-        strokeColor = "#b91c1c";
-        weight = 5.5;
+        strokeColor = "#991b1b";
+        weight = 5.2;
         opacity = 1.0;
         dashArray = "6, 6";
       } else if (riskLevel === "Critical") {
         strokeColor = "#dc2626";
-        weight = 5.0;
+        weight = 4.6;
         opacity = 0.95;
       } else if (riskLevel === "High") {
         strokeColor = "#ea580c";
-        weight = 4.2;
-        opacity = 0.95;
+        weight = 3.8;
+        opacity = 0.9;
+      } else if (riskLevel === "Moderate") {
+        strokeColor = "#f59e0b";
+        weight = 3.2;
+        opacity = 0.85;
       }
 
       const line = L.polyline(road.coordinates, {

@@ -11,6 +11,9 @@ import {
   AlertCircle,
   Minimize2,
   Maximize2,
+  Plus,
+  Bell,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +30,9 @@ interface ProductionBottomSheetProps {
   onPlanRouteToShelter: (shelter: Shelter) => void;
   onOpenReportModal: () => void;
   onClearRoute: () => void;
+  onOpenAlerts?: () => void;
+  onOpenHelp?: () => void;
+  alertCount?: number;
 }
 
 export default function ProductionBottomSheet({
@@ -37,9 +43,12 @@ export default function ProductionBottomSheet({
   onPlanRouteToShelter,
   onOpenReportModal,
   onClearRoute,
+  onOpenAlerts,
+  onOpenHelp,
+  alertCount = 0,
 }: ProductionBottomSheetProps) {
   const t = useI18n();
-  // Mobile snap heights: 0 = peek (80px), 1 = half (380px), 2 = full (82vh)
+  // Mobile snap heights: 0 = peek (56px), 1 = half (360px), 2 = full (80vh)
   const [mobileSnap, setMobileSnap] = useState<0 | 1 | 2>(0);
   // Desktop collapsed state
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -62,27 +71,27 @@ export default function ProductionBottomSheet({
   return (
     <div
       className={`fixed z-30 transition-all duration-300 bg-background/98 backdrop-blur-xl border-border shadow-2xl flex flex-col
-        /* Mobile: Full-width bottom sheet anchored directly above bottom nav */
-        left-0 right-0 bottom-16 w-full rounded-t-3xl border-t
+        /* Mobile: Full-width bottom sheet anchored directly flush above bottom nav (h-14) */
+        left-0 right-0 bottom-14 w-full rounded-t-2xl border-t
         /* Desktop: Floating left sidebar card with rounded corners and no overlap */
-        sm:left-4 sm:right-auto sm:top-20 sm:bottom-auto sm:w-[390px] sm:rounded-2xl sm:border sm:shadow-2xl
+        sm:left-4 sm:right-auto sm:top-20 sm:bottom-auto sm:w-[400px] sm:rounded-2xl sm:border sm:shadow-2xl
         ${
           /* Mobile height based on snap */
           mobileSnap === 0
-            ? "h-20 sm:h-auto sm:max-h-[calc(100dvh-6.5rem)]"
+            ? "h-14 sm:h-auto sm:max-h-[calc(100dvh-6.5rem)]"
             : mobileSnap === 1
-            ? "h-[390px] sm:h-auto sm:max-h-[calc(100dvh-6.5rem)]"
-            : "h-[82vh] sm:h-auto sm:max-h-[calc(100dvh-6.5rem)]"
+            ? "h-[360px] sm:h-auto sm:max-h-[calc(100dvh-6.5rem)]"
+            : "h-[80vh] sm:h-auto sm:max-h-[calc(100dvh-6.5rem)]"
         }
       `}
     >
       {/* DRAG HANDLE & STATUS HEADER */}
       <div
         onClick={toggleMobileSnap}
-        className="w-full pt-2.5 pb-2.5 px-4 cursor-pointer flex flex-col items-center select-none"
+        className="w-full pt-2 pb-2 px-4 cursor-pointer flex flex-col items-center select-none"
       >
         {/* Mobile drag bar */}
-        <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30 mb-2 sm:hidden" />
+        <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30 mb-1.5 sm:hidden" />
 
         <div className="w-full flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -92,10 +101,10 @@ export default function ProductionBottomSheet({
             />
             <div className="truncate">
               <h3 className="text-xs sm:text-sm font-bold text-foreground truncate">
-                {civicStatus.headline}
+                {currentTile?.locality || "Sion–Kurla Corridor"}
               </h3>
               <p className="text-[11px] text-muted-foreground truncate">
-                {civicStatus.subhead}
+                {currentTile?.ward ? `${currentTile.ward} • ${civicStatus.headline}` : civicStatus.headline}
               </p>
             </div>
           </div>
@@ -135,10 +144,35 @@ export default function ProductionBottomSheet({
         </div>
       </div>
 
+      {/* DESKTOP PRIMARY ACTION BAR */}
+      <div className={`hidden sm:grid grid-cols-2 gap-2.5 pt-1.5 pb-2.5 px-4 border-b border-border/60 ${desktopCollapsed ? "sm:hidden" : ""}`}>
+        <Button
+          size="sm"
+          onClick={onOpenReportModal}
+          className="h-9 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 shadow-sm rounded-xl cursor-pointer"
+        >
+          <Plus className="w-4 h-4 stroke-[2.5]" />
+          <span>{t.tabReport}</span>
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (nearestShelter) onPlanRouteToShelter(nearestShelter);
+          }}
+          disabled={!nearestShelter}
+          className="h-9 text-xs font-semibold gap-1.5 rounded-xl border-border hover:bg-muted cursor-pointer"
+        >
+          <Navigation className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>{t.safeRoute}</span>
+        </Button>
+      </div>
+
       {/* BODY CONTENT */}
       {/* Visible on Mobile when snap > 0; Visible on Desktop unless desktopCollapsed */}
       <div
-        className={`flex-1 overflow-y-auto px-4 pb-6 space-y-3.5 text-xs transition-opacity duration-200 ${
+        className={`flex-1 overflow-y-auto px-4 pb-6 pt-3 space-y-3.5 text-xs transition-opacity duration-200 ${
           mobileSnap === 0 ? "hidden sm:block" : "block"
         } ${desktopCollapsed ? "sm:hidden" : "sm:block"}`}
       >

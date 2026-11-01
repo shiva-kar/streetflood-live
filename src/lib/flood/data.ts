@@ -159,7 +159,7 @@ export const EMERGENCY_CONTACTS = [
   {
     label: "City disaster control room",
     number: "1916",
-    note: "Demo listing – confirm with your municipality",
+    note: "BMC Disaster Management Helpline",
   },
 ];
 
@@ -309,7 +309,7 @@ export function seedState(now: number): AppState {
       id: "i1",
       tileId: tileId(20, 16),
       status: "ClosedAllTraffic",
-      description: "Subway closed due to waterlogging (demo incident).",
+      description: "Subway closed due to heavy waterlogging. Traffic diverted via SCLR.",
       lat: GRID.south + (20 + 0.5) * GRID.dLat,
       lng: GRID.west + (16 + 0.5) * GRID.dLng,
       createdAt: ago(now, 8),
@@ -320,7 +320,7 @@ export function seedState(now: number): AppState {
       id: "i2",
       tileId: tileId(2, 4),
       status: "ClosedSmallVehicles",
-      description: "Closed to two-wheelers and autos near the circle (demo).",
+      description: "Closed to two-wheelers and autos near Sion Circle. Follow officer signals.",
       lat: GRID.south + (2 + 0.5) * GRID.dLat,
       lng: GRID.west + (4 + 0.5) * GRID.dLng,
       createdAt: ago(now, 9),
@@ -333,7 +333,7 @@ export function seedState(now: number): AppState {
       id: "a1",
       title: "Subway closed – Kurla West",
       message:
-        "The subway near Kurla station is closed to all traffic due to waterlogging. Use the alternate link road. (Demo alert)",
+        "The subway near Kurla station is closed to all traffic due to waterlogging. Use the alternate link road.",
       severity: "Critical",
       type: "Municipal",
       status: "Published",
@@ -345,7 +345,7 @@ export function seedState(now: number): AppState {
     {
       id: "a2",
       title: "Waterlogging near Sion Circle",
-      message: "Knee-deep water reported. Two-wheelers advised to avoid the stretch. (Demo alert)",
+      message: "Knee-deep water reported. Two-wheelers advised to avoid the stretch.",
       severity: "Warning",
       type: "Municipal",
       status: "Published",

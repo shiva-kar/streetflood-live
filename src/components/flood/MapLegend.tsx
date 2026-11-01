@@ -5,7 +5,7 @@ export default function MapLegend() {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 pointer-events-auto">
+    <div className="absolute bottom-18 right-3 sm:bottom-6 sm:right-4 z-20 pointer-events-auto">
       {/* Expanded Popover (Opens Upward) */}
       {expanded && (
         <div className="absolute bottom-full mb-2 right-0 w-64 sm:w-72 max-w-[calc(100vw-24px)] rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl p-3 sm:p-3.5 space-y-3 text-xs text-slate-800 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-150 max-h-[65vh] overflow-y-auto no-scrollbar">

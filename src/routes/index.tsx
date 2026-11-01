@@ -9,6 +9,9 @@ import AuthModal from "@/components/flood/AuthModal";
 import EmergencyHelpModal from "@/components/flood/EmergencyHelpModal";
 import ControlRoomModal from "@/components/flood/ControlRoomModal";
 import AlertsDrawer from "@/components/flood/AlertsDrawer";
+import MapLayerControls from "@/components/flood/MapLayerControls";
+import MapLegend from "@/components/flood/MapLegend";
+import type { MapLayerOptions } from "@/lib/flood/types";
 import {
   fetchRealWeather,
   fetchOsmShelters,
@@ -73,6 +76,16 @@ export default function StreetFloodApp() {
   const [liveReports, setLiveReports] = useState<FloodReport[]>(localState.reports);
   const [liveIncidents, setLiveIncidents] = useState<RoadIncident[]>(localState.incidents);
   const [liveAlerts, setLiveAlerts] = useState<FloodAlert[]>(localState.alerts);
+
+  // Map Layer Visibility Controls
+  const [layerOptions, setLayerOptions] = useState<MapLayerOptions>({
+    showTechnicalGrid: false,
+    showAffectedRoads: true,
+    showShelters: true,
+    showClosures: true,
+    showReports: true,
+    showEvacuationRoute: true,
+  });
 
   // Selection & Navigation
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
@@ -363,6 +376,9 @@ export default function StreetFloodApp() {
         onOpenControlRoom={() => setControlRoomOpen(true)}
         canAccessControlRoom={canAccessControlRoom}
         demoMode={demoMode}
+        onOpenAlerts={() => setAlertsDrawerOpen(true)}
+        onOpenHelp={() => setHelpModalOpen(true)}
+        alertCount={liveAlerts.length}
       />
 
       {/* 2. FULLSCREEN MAP */}
@@ -379,6 +395,7 @@ export default function StreetFloodApp() {
           roadRouteCoords={roadRoute?.coordinates}
           roadRouteSafety={roadRoute?.safetyStatus}
           showPredicted={true}
+          layerOptions={layerOptions}
           onTileClick={(tid, lat, lng) => {
             setSelectedTileId(tid);
           }}
@@ -390,6 +407,16 @@ export default function StreetFloodApp() {
         />
       </div>
 
+      {/* MAP LAYER CONTROLS (TOP-RIGHT) */}
+      <MapLayerControls
+        options={layerOptions}
+        onChange={setLayerOptions}
+        isAdmin={canAccessControlRoom}
+      />
+
+      {/* FLOOD RISK LEGEND (BOTTOM-RIGHT) */}
+      <MapLegend />
+
       {/* 3. PERSISTENT 3-SNAP BOTTOM SHEET (PEEK / HALF / FULL) */}
       <ProductionBottomSheet
         currentTile={currentTile}
@@ -399,6 +426,9 @@ export default function StreetFloodApp() {
         onPlanRouteToShelter={handlePlanRouteToShelter}
         onOpenReportModal={() => setReportModalOpen(true)}
         onClearRoute={() => setRoadRoute(null)}
+        onOpenAlerts={() => setAlertsDrawerOpen(true)}
+        onOpenHelp={() => setHelpModalOpen(true)}
+        alertCount={liveAlerts.length}
       />
 
       {/* 4. BOTTOM 4-TAB NAVIGATION DOCK */}

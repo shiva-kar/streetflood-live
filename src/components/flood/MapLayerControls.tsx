@@ -19,7 +19,7 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
   };
 
   return (
-    <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20">
+    <div className="absolute top-16 right-3 sm:top-20 sm:right-4 z-20">
       <button
         type="button"
         onClick={() => setOpen(!open)}

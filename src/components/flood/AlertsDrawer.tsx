@@ -156,7 +156,7 @@ export default function AlertsDrawer({
                     >
                       {alert.type === "Municipal"
                         ? "Verified – Municipal"
-                        : "System – Predictive / Simulated"}
+                        : "System – Predictive Warning"}
                     </Badge>
                   </div>
                   <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">

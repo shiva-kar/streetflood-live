@@ -22,42 +22,35 @@ export default function BottomNav({
 
   return (
     <nav
-      className="fixed z-40 bg-background/95 backdrop-blur-xl shadow-xl transition-all
-        /* Mobile: Flush to bottom bezel, 100% full width, zero exposed map gaps */
-        left-0 right-0 bottom-0 w-full border-t border-border px-4 py-2 flex items-center justify-around pb-[max(0.5rem,env(safe-area-inset-bottom))]
-        /* Desktop: Standalone centered floating pill with rounded borders and no card behind it */
-        sm:left-1/2 sm:right-auto sm:bottom-6 sm:-translate-x-1/2 sm:w-auto sm:rounded-2xl sm:border sm:border-border sm:px-6 sm:py-2.5 sm:gap-6
-      "
+      className="sm:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-background/98 backdrop-blur-xl border-t border-border flex items-center justify-around px-3 pb-[max(0.25rem,env(safe-area-inset-bottom))] select-none"
+      aria-label="Mobile Navigation"
     >
       {/* 1. MAP TAB */}
       <button
         type="button"
         onClick={() => onTabChange("map")}
-        className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+        className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors cursor-pointer ${
           activeTab === "map"
-            ? "text-primary font-bold scale-105"
+            ? "text-primary font-bold"
             : "text-muted-foreground hover:text-foreground font-medium"
         }`}
       >
-        <Map className="w-5 h-5" />
+        <Map className="w-4 h-4" />
         <span className="text-[10px]">{t.tabMap}</span>
       </button>
 
-      {/* 2. REPORT FLOODING (THUMB-FRIENDLY ELEVATED BUTTON) */}
+      {/* 2. REPORT FLOODING (CLEAN FLUSH EMERGENCY BUTTON) */}
       <button
         type="button"
         onClick={() => {
           onTabChange("report");
           onOpenReport();
         }}
-        className="flex flex-col items-center justify-center -mt-5 cursor-pointer group"
+        className="flex items-center justify-center h-10 px-3.5 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-95 transition-all gap-1.5 cursor-pointer font-bold text-xs"
+        aria-label="Report Flood"
       >
-        <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:scale-110 active:scale-95 transition-all">
-          <Plus className="w-6 h-6 stroke-[2.5]" />
-        </div>
-        <span className="text-[10px] font-bold text-red-600 dark:text-red-400 mt-1">
-          {t.tabReport}
-        </span>
+        <Plus className="w-4 h-4 stroke-[2.5]" />
+        <span>{t.tabReport}</span>
       </button>
 
       {/* 3. ALERTS TAB */}
@@ -67,16 +60,16 @@ export default function BottomNav({
           onTabChange("alerts");
           onOpenAlerts();
         }}
-        className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all relative cursor-pointer ${
+        className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors relative cursor-pointer ${
           activeTab === "alerts"
-            ? "text-primary font-bold scale-105"
+            ? "text-primary font-bold"
             : "text-muted-foreground hover:text-foreground font-medium"
         }`}
       >
         <div className="relative">
-          <Bell className="w-5 h-5" />
+          <Bell className="w-4 h-4" />
           {alertCount > 0 && (
-            <span className="absolute -top-1 -right-2 px-1.5 py-0.2 bg-red-600 text-white font-bold text-[9px] rounded-full ring-2 ring-background">
+            <span className="absolute -top-1 -right-2 px-1.5 py-0.2 bg-red-600 text-white font-bold text-[8px] rounded-full ring-2 ring-background">
               {alertCount}
             </span>
           )}
@@ -91,13 +84,13 @@ export default function BottomNav({
           onTabChange("help");
           onOpenHelp();
         }}
-        className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+        className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors cursor-pointer ${
           activeTab === "help"
-            ? "text-primary font-bold scale-105"
+            ? "text-primary font-bold"
             : "text-muted-foreground hover:text-foreground font-medium"
         }`}
       >
-        <LifeBuoy className="w-5 h-5 text-rose-500" />
+        <LifeBuoy className="w-4 h-4 text-rose-500" />
         <span className="text-[10px]">{t.tabHelp}</span>
       </button>
     </nav>
