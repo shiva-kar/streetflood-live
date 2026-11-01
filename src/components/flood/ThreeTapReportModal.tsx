@@ -72,8 +72,44 @@ export default function ThreeTapReportModal({
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compactUrl = await fileToCompactDataUrl(file, 640);
-      setPhotoDataUrl(compactUrl);
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1024 / bitmap.width, 1024 / bitmap.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blobToDataUrl = (blob: Blob) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Could not encode photo."));
+          reader.readAsDataURL(blob);
+        });
+      let quality = 0.8;
+      let encoded: string | null = null;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/webp", quality),
+        );
+        if (!blob) break;
+        if (blob.size <= 150 * 1024) {
+          encoded = await blobToDataUrl(blob);
+          break;
+        }
+        quality -= 0.12;
+      }
+      if (!encoded) {
+        canvas.width = Math.max(1, Math.round(canvas.width * 0.75));
+        canvas.height = Math.max(1, Math.round(canvas.height * 0.75));
+        canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/webp", 0.65),
+        );
+        if (!blob || blob.size > 150 * 1024) throw new Error("Photo is too large after compression.");
+        encoded = await blobToDataUrl(blob);
+      }
+      setPhotoDataUrl(encoded);
+      bitmap.close();
     } catch {
       toast.error("Could not process photo. Please choose another image.");
     }

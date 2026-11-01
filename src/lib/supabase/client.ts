@@ -49,6 +49,7 @@ export function getSupabase(): SupabaseClient | null {
   if (!url || !key || !url.startsWith("https://")) {
     return null;
   }
+
   try {
     // Structural zero-cost assert: ensure URL is an authentic Supabase free-tier project
     assertZeroCostUrl(url);
@@ -65,6 +66,28 @@ export function getSupabase(): SupabaseClient | null {
     console.error("Failed to initialize Supabase client:", err);
     return null;
   }
+
+}
+
+export async function uploadFloodPhoto(fileBlob: Blob, reportId: string): Promise<string | null> {
+  const dataUrl = await new Promise<string | null>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(fileBlob);
+  });
+  const sb = getSupabase();
+  if (!sb) return dataUrl;
+  const path = `public/${reportId}.webp`;
+  const { data, error } = await sb.storage.from("flood-photos").upload(path, fileBlob, {
+    contentType: "image/webp",
+    upsert: true,
+  });
+  if (error || !data) {
+    console.warn("Flood photo upload failed; retaining offline data URL.", error?.message);
+    return dataUrl;
+  }
+  return sb.storage.from("flood-photos").getPublicUrl(data.path).data.publicUrl;
 }
 
 // ---------------------------------------------------------------------------
@@ -274,15 +297,9 @@ export async function submitLiveReport(report: {
     try {
       const res = await fetch(report.photoDataUrl);
       const blob = await res.blob();
-      const fileName = `report_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`;
-      const { data: uploadData } = await sb.storage.from("reports").upload(fileName, blob, {
-        contentType: "image/jpeg",
-        upsert: false,
-      });
-      if (uploadData) {
-        const { data: pubUrl } = sb.storage.from("reports").getPublicUrl(uploadData.path);
-        uploadedPhotoUrl = pubUrl.publicUrl;
-      }
+      uploadedPhotoUrl =
+        (await uploadFloodPhoto(blob, `report_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`)) ||
+        uploadedPhotoUrl;
     } catch (e) {
       console.warn("Storage upload failed, keeping inline/data URL:", e);
     }

@@ -1,4 +1,4 @@
-import type { RoadRouteResult, RoadRouteStep, Shelter } from "./types";
+import type { EvacuationMode, RoadRouteResult, RoadRouteStep, Shelter } from "./types";
 import { assertZeroCostUrl } from "../guards/zeroCostGuard";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
@@ -8,7 +8,7 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ];
-const OSRM_BASE = "https://router.project-osrm.org/route/v1/driving";
+const OSRM_BASE = "https://router.project-osrm.org/route/v1";
 
 // Statically verify all configured endpoints conform to $0 zero-cost rules
 assertZeroCostUrl(NOMINATIM_BASE);
@@ -135,6 +135,7 @@ export function getCurrentUserGps(): Promise<GeolocationResult> {
 // ---------------------------------------------------------------------------
 export interface RealWeatherResult {
   recentRainMm: number; // last hour
+  rainRateMmPerHour: number;
   forecastRain3hMm: number; // next 3 hours
   hourlyTimes: string[];
   hourlyRainMm: number[];
@@ -152,7 +153,7 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
   if (cached) return cached;
 
   try {
-    const url = `${OPEN_METEO_BASE}?latitude=${snapLat}&longitude=${snapLng}&hourly=precipitation,rain&current=precipitation,temperature_2m,weather_code&forecast_hours=6&past_hours=2&timezone=auto`;
+    const url = `${OPEN_METEO_BASE}?latitude=${snapLat}&longitude=${snapLng}&hourly=precipitation,rain&current=precipitation,rain,temperature_2m,weather_code&forecast_hours=6&past_hours=2&timezone=auto`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("Weather service unavailable");
     const json = await res.json();
@@ -174,6 +175,7 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
 
     const result: RealWeatherResult = {
       recentRainMm: Math.round(pastHourRain * 10) / 10,
+      rainRateMmPerHour: Number((json.current?.rain ?? json.current?.precipitation ?? pastHourRain ?? 0).toFixed(1)),
       forecastRain3hMm: Math.round(next3h * 10) / 10,
       hourlyTimes: times.slice(Math.max(0, currentIdx - 1), currentIdx + 5),
       hourlyRainMm: rainArr.slice(Math.max(0, currentIdx - 1), currentIdx + 5),
@@ -187,6 +189,7 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
     console.warn("Open-Meteo weather fetch error:", e);
     return {
       recentRainMm: 0,
+      rainRateMmPerHour: 0,
       forecastRain3hMm: 0,
       hourlyTimes: [],
       hourlyRainMm: [],
@@ -292,11 +295,83 @@ out center 30;
         setCached(cacheKey, shelters);
         return shelters;
       }
+
     } catch (e) {
       console.warn("Overpass endpoint failed, trying next:", e);
     }
   }
 
+  return [];
+}
+
+/**
+ * Loads publicly mapped emergency assembly points and shelters across India.
+ * The query is intentionally limited to shelter-specific OSM tags so ordinary
+ * schools and hospitals do not become false evacuation destinations.
+ */
+export async function fetchIndiaShelters(): Promise<Shelter[]> {
+  const cacheKey = "india_shelters_osm_v2";
+  const cached = getCached<Shelter[]>(cacheKey, 24 * 60 * 60 * 1000);
+  if (cached) return cached;
+
+  const query = `
+[out:json][timeout:30];
+(
+  nwr["amenity"="shelter"](6.5,68,35.7,97.5);
+  nwr["emergency"="assembly_point"](6.5,68,35.7,97.5);
+  nwr["social_facility"="shelter"](6.5,68,35.7,97.5);
+);
+out center 5000;
+`;
+
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const shelters: Shelter[] = (json.elements || [])
+        .map((el: {
+          id: number;
+          type?: string;
+          lat?: number;
+          lon?: number;
+          center?: { lat: number; lon: number };
+          tags?: Record<string, string>;
+        }) => {
+          const lat = el.lat ?? el.center?.lat;
+          const lng = el.lon ?? el.center?.lon;
+          if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          const tags = el.tags || {};
+          const name =
+            tags["name:en"] ||
+            tags.name ||
+            tags["official_name:en"] ||
+            "Public emergency assembly point";
+          const locality = [tags["addr:city"], tags["addr:district"], tags["addr:state"]]
+            .filter(Boolean)
+            .join(", ");
+          return {
+            id: `osm_india_shelter_${el.type || "element"}_${el.id}`,
+            name,
+            address: locality || "India · OpenStreetMap emergency location",
+            lat,
+            lng,
+            kind: "Community Hall" as const,
+            capacityStatus: "Space available" as const,
+            provenance: "OpenStreetMap Public Data" as const,
+            accessibilityNote:
+              tags.wheelchair === "yes" ? "Wheelchair access mapped in OpenStreetMap." : undefined,
+            wheelchairAccessible: tags.wheelchair === "yes",
+            drinkingWater: tags.drinking_water === "yes",
+          } satisfies Shelter;
+        })
+        .filter((s: Shelter | null): s is Shelter => s !== null);
+      setCached(cacheKey, shelters);
+      return shelters;
+    } catch {
+      // Try the next public Overpass mirror.
+    }
+  }
   return [];
 }
 
@@ -307,8 +382,10 @@ export async function calculateWorldwideSafeRoute(
   start: [number, number],
   destination: [number, number],
   blockedPoints?: Array<{ lat: number; lng: number; description: string }>,
+  mode: EvacuationMode = "car",
 ): Promise<RoadRouteResult | null> {
-  const url = `${OSRM_BASE}/${start[1]},${start[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson&steps=true`;
+  const profile = mode === "pedestrian" ? "foot" : "driving";
+  const url = `${OSRM_BASE}/${profile}/${start[1]},${start[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson&steps=true`;
 
   try {
     const res = await fetch(url);
@@ -341,16 +418,19 @@ export async function calculateWorldwideSafeRoute(
     let blockedClosure: RoadRouteResult["blockedByClosure"] = undefined;
     let safetyScore = 95;
     let safetyStatus: RoadRouteResult["safetyStatus"] = "Safe";
-    let safetyMessage = "Clear road route. No impassable water reported.";
+    let safetyMessage = `Clear ${mode} route. No impassable water reported.`;
     const warnings: string[] = [];
 
     if (blockedPoints && blockedPoints.length > 0) {
       for (const bp of blockedPoints) {
         // Find minimum distance from any route coordinate to blocked point
         for (const coord of coords) {
-          const dLat = coord[0] - bp.lat;
-          const dLng = coord[1] - bp.lng;
-          const distKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
+          const dLat = ((coord[0] - bp.lat) * Math.PI) / 180;
+          const dLng = ((coord[1] - bp.lng) * Math.PI) / 180;
+          const lat1 = (coord[0] * Math.PI) / 180;
+          const lat2 = (bp.lat * Math.PI) / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+          const distKm = 6371 * 2 * Math.asin(Math.sqrt(a));
           if (distKm < 0.12) {
             // within ~120 meters
             blockedClosure = {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Sparkles, Loader2 } from "lucide-react";
+import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Loader2, AlertTriangle, Bell, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,7 @@ import {
 import { searchPlaces, type PlaceSearchResult } from "@/lib/flood/openData";
 import { getLanguage, setLanguage, useI18n, type Language } from "@/lib/i18n";
 import type { UserProfile } from "@/lib/supabase/client";
+import { speakAlert } from "@/lib/flood/voiceAnnouncer";
 
 interface ProductionHeaderProps {
   onSelectPlace: (lat: number, lng: number, name: string) => void;
@@ -20,7 +21,12 @@ interface ProductionHeaderProps {
   onOpenAuth: () => void;
   onOpenControlRoom?: () => void;
   canAccessControlRoom: boolean;
-  demoMode: boolean;
+  demoMode?: boolean;
+  onOpenAlerts?: () => void;
+  onOpenHelp?: () => void;
+  alertCount?: number;
+  criticalAlert?: string | undefined;
+  activeCityName?: string;
 }
 
 export default function ProductionHeader({
@@ -31,7 +37,11 @@ export default function ProductionHeader({
   onOpenAuth,
   onOpenControlRoom,
   canAccessControlRoom,
-  demoMode,
+  onOpenAlerts,
+  onOpenHelp,
+  alertCount = 0,
+  criticalAlert,
+  activeCityName,
 }: ProductionHeaderProps) {
   const t = useI18n();
   const [query, setQuery] = useState("");
@@ -75,19 +85,23 @@ export default function ProductionHeader({
   };
 
   return (
-    <header className="relative z-30 w-full px-3 pt-3 pb-1.5 flex flex-col gap-2">
-      <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
+    <header className="relative z-30 w-full px-3 pt-3 pb-1.5 sm:px-4">
+      <div className="flex items-center gap-2 w-full">
         {/* LOGO & BRAND */}
-        <div className="flex items-center gap-2 shrink-0 bg-background/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border shadow-sm">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
+        <div className="flex items-center gap-2 shrink-0 rounded-xl border border-border bg-background/95 px-2.5 py-2 shadow-sm backdrop-blur-md sm:px-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
             SF
           </div>
-          <span className="font-bold text-sm tracking-tight text-foreground hidden sm:inline">
+          <span className="hidden text-sm font-bold tracking-tight text-foreground sm:inline">
             StreetFlood<span className="text-primary font-normal">.Live</span>
           </span>
-          {demoMode && (
-            <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full border border-amber-500/20">
-              Demo Mode
+          {activeCityName ? (
+            <span className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground md:inline truncate max-w-[140px]">
+              {activeCityName}
+            </span>
+          ) : (
+            <span className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground md:inline">
+              Live Civic Monitor
             </span>
           )}
         </div>
@@ -102,8 +116,14 @@ export default function ProductionHeader({
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setTimeout(() => setIsFocused(false), 250)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && results.length > 0) {
+                  e.preventDefault();
+                  handleSelectResult(results[0]);
+                }
+              }}
               placeholder={t.searchPlaceholder}
-              className="pl-9 pr-8 h-10 rounded-2xl bg-background/95 backdrop-blur-md border shadow-sm text-xs sm:text-sm focus-visible:ring-1 focus-visible:ring-primary"
+              className="h-11 rounded-xl border border-border bg-background/95 pl-9 pr-8 text-xs shadow-sm backdrop-blur-md focus-visible:ring-1 focus-visible:ring-primary sm:text-sm"
             />
             {query ? (
               <button
@@ -128,7 +148,8 @@ export default function ProductionHeader({
                 <button
                   key={r.placeId}
                   type="button"
-                  onMouseDown={() => handleSelectResult(r)}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelectResult(r); }}
+                  onClick={() => handleSelectResult(r)}
                   className="w-full px-3.5 py-2.5 text-left hover:bg-muted/60 transition-colors flex items-start gap-2.5 border-b last:border-b-0 cursor-pointer"
                 >
                   <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -149,7 +170,7 @@ export default function ProductionHeader({
           onClick={onLocateUser}
           disabled={isLocating}
           title={t.useMyLocation}
-          className="h-10 w-10 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hover:text-primary transition-colors"
+          className="h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hover:text-primary transition-colors"
         >
           {isLocating ? (
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -164,7 +185,7 @@ export default function ProductionHeader({
             <Button
               variant="outline"
               size="icon"
-              className="h-10 w-10 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm"
+              className="hidden h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm sm:inline-flex"
             >
               <Globe className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -191,16 +212,60 @@ export default function ProductionHeader({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* ALERTS QUICK-BUTTON (DESKTOP) */}
+        {onOpenAlerts && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenAlerts}
+            className="relative hidden h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md md:inline-flex"
+          >
+            <Bell className="w-4 h-4 text-primary" />
+            <span className="hidden lg:inline">{t.tabAlerts}</span>
+            {alertCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-red-600 text-white font-bold text-[8px] rounded-full">
+                {alertCount}
+              </span>
+            )}
+          </Button>
+        )}
+        {criticalAlert && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => speakAlert(criticalAlert, currentLang)}
+            className="hidden h-11 w-11 shrink-0 rounded-xl border border-border bg-background/95 shadow-sm backdrop-blur-md md:inline-flex"
+            title="Listen to critical alert"
+            aria-label="Listen to critical alert"
+          >
+            <Volume2 className="w-4 h-4 text-red-600" />
+          </Button>
+        )}
+
+        {/* EMERGENCY 112 DIRECT CALL/HELP (DESKTOP) */}
+        {onOpenHelp && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onOpenHelp}
+            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-red-700 px-3.5 text-xs font-bold text-white shadow-sm hover:bg-red-800 sm:inline-flex"
+          >
+            <AlertTriangle className="w-4 h-4" />
+            <span>112 Help</span>
+          </Button>
+        )}
+
         {/* CONTROL ROOM BUTTON (ONLY IF PERMITTED) */}
         {canAccessControlRoom && onOpenControlRoom && (
           <Button
             variant="default"
             size="sm"
-            onClick={onOpenControlRoom}
-            className="h-10 px-3 rounded-2xl shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm gap-1.5 hidden md:flex"
+            onClick={onOpenControlRoom} data-testid="control-room-button"
+            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-slate-800 px-3 text-xs font-semibold text-white shadow-sm hover:bg-slate-900 md:flex"
           >
             <ShieldCheck className="w-4 h-4" />
-            {t.controlRoom}
+            <span>{t.controlRoom || "Control Room"}</span>
           </Button>
         )}
 
@@ -209,7 +274,7 @@ export default function ProductionHeader({
           variant="outline"
           size="sm"
           onClick={onOpenAuth}
-          className="h-10 px-3 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm gap-1.5 text-xs font-semibold"
+          className="h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md"
         >
           <User className="w-4 h-4 text-muted-foreground" />
           <span className="hidden sm:inline">

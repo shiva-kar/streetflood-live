@@ -1,7 +1,12 @@
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, ShieldAlert, CheckSquare, AlertTriangle, LifeBuoy } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+}
 
 interface EmergencyHelpModalProps {
   open: boolean;
@@ -18,6 +23,18 @@ const CHECKLIST_ITEMS = [
 
 export default function EmergencyHelpModal({ open, onClose }: EmergencyHelpModalProps) {
   const t = useI18n();
+  const [canInstall, setCanInstall] = useState(false);
+  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event as BeforeInstallPromptEvent);
+      setCanInstall(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -77,6 +94,28 @@ export default function EmergencyHelpModal({ open, onClose }: EmergencyHelpModal
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+            <p className="text-xs font-bold text-foreground">Install StreetFlood.Live for emergency access</p>
+            <p className="text-[11px] text-muted-foreground">
+              Android: use your browser menu and choose “Install app” or “Add to Home screen”.
+              iPhone: tap Share, then “Add to Home Screen”.
+            </p>
+            {canInstall && installEvent && (
+              <Button
+                type="button"
+                size="sm"
+                className="w-full h-9 text-xs"
+                onClick={async () => {
+                  await installEvent.prompt();
+                  setCanInstall(false);
+                  setInstallEvent(null);
+                }}
+              >
+                Install App
+              </Button>
+            )}
           </div>
 
           <Button variant="outline" onClick={onClose} className="w-full text-xs h-9">

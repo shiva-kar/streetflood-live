@@ -166,7 +166,9 @@ export function routeRisk(
   const step = Math.max(1, Math.floor(coords.length / 400));
   const live = reports.filter((r) => reportWeight(r, now) > 0);
   for (let i = 0; i < coords.length; i += step) {
-    const [lat, lng] = coords[i];
+    const pt = coords[i];
+    if (!pt) continue;
+    const [lat, lng] = pt;
     if (closures.some((c) => metresBetween(lat, lng, c.lat, c.lng) < 40)) {
       worst = 4;
       hits++;
@@ -178,5 +180,5 @@ export function routeRisk(
       worst = Math.max(worst, order.indexOf(levelFromScore(spotScore(near, now))));
     }
   }
-  return { level: order[worst], hits };
+  return { level: order[worst] ?? "clear", hits };
 }

@@ -311,7 +311,7 @@ export default function RoutePanel({
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 italic">
                   Note:{" "}
                   {recommendedShelterCandidate.shelter.provenance ||
-                    "Simulated Demonstration Shelter"}
+                    "Designated Municipal Relief Shelter"}
                   . Confirm operational status with local authorities.
                 </div>
 

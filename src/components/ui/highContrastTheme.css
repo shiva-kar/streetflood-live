@@ -1,0 +1,21 @@
+[data-high-contrast="true"] {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --primary: 145 100% 50%;
+  --border: 0 0% 100%;
+  background: #000;
+  color: #fff;
+}
+
+[data-high-contrast="true"] button,
+[data-high-contrast="true"] input,
+[data-high-contrast="true"] textarea,
+[data-high-contrast="true"] select {
+  border-width: 2px;
+  font-weight: 700;
+}
+
+[data-high-contrast="true"] :focus-visible {
+  outline: 3px solid #ffcc00;
+  outline-offset: 3px;
+}

@@ -19,6 +19,7 @@ export interface ViewportBounds {
   east: number;
   centerLat: number;
   centerLng: number;
+  zoom: number;
 }
 
 export interface FloodMapProps {
@@ -68,6 +69,7 @@ export default function FloodMap(props: FloodMapProps) {
   const map = useRef<LType.Map | null>(null);
   const rects = useRef(new Map<string, LType.Rectangle>());
   const layers = useRef<Record<string, LType.LayerGroup>>({});
+  const baseTiles = useRef<LType.TileLayer | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -82,9 +84,12 @@ export default function FloodMap(props: FloodMapProps) {
   // Initialize Map
   useEffect(() => {
     if (!L || !el.current || map.current) return;
-    const initialCenter = props.initialCenter || props.userPos || MAP_CENTER;
+    const center = props.initialCenter || props.userPos || MAP_CENTER;
+    const safeCenter: [number, number] =
+      center && !isNaN(center[0]) && !isNaN(center[1]) ? center : MAP_CENTER;
+
     const m = L.map(el.current, {
-      center: initialCenter,
+      center: safeCenter,
       zoom: 15,
       minZoom: 3,
       maxZoom: 19,
@@ -108,7 +113,7 @@ export default function FloodMap(props: FloodMapProps) {
 
     L.control.zoom({ position: "bottomleft" }).addTo(m);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    baseTiles.current = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
@@ -128,6 +133,7 @@ export default function FloodMap(props: FloodMapProps) {
     }
 
     m.on("click", (e: LType.LeafletMouseEvent) => {
+      if (!e.latlng || isNaN(e.latlng.lat) || isNaN(e.latlng.lng)) return;
       const tid = tileIdFromLatLng(e.latlng.lat, e.latlng.lng);
       propsRef.current.onTileClick(tid, e.latlng.lat, e.latlng.lng);
     });
@@ -139,9 +145,13 @@ export default function FloodMap(props: FloodMapProps) {
     const emitViewport = () => {
       const b = m.getBounds();
       const center = m.getCenter();
+      if (!b || !center || isNaN(center.lat) || isNaN(center.lng)) return;
+
       const ids = new Set<string>();
       for (const t of propsRef.current.tiles) {
-        if (b.contains([t.centerLat, t.centerLng])) ids.add(t.id);
+        if (!isNaN(t.centerLat) && !isNaN(t.centerLng) && b.contains([t.centerLat, t.centerLng])) {
+          ids.add(t.id);
+        }
       }
       propsRef.current.onViewportChange?.(ids);
       propsRef.current.onBoundsChange?.({
@@ -151,11 +161,15 @@ export default function FloodMap(props: FloodMapProps) {
         east: b.getEast(),
         centerLat: center.lat,
         centerLng: center.lng,
+        zoom: m.getZoom(),
       });
     };
 
     m.on("moveend", emitViewport);
     map.current = m;
+    if (typeof window !== "undefined") {
+      (window as any).__leafletMap = m;
+    }
 
     setTimeout(() => {
       m.invalidateSize();
@@ -172,19 +186,35 @@ export default function FloodMap(props: FloodMapProps) {
       ro.disconnect();
       m.remove();
       map.current = null;
+      if (typeof window !== "undefined") {
+        delete (window as any).__leafletMap;
+      }
       currentRects.clear();
     };
   }, [L]);
 
+  useEffect(() => {
+    if (!L || !map.current || !baseTiles.current) return;
+    const m = map.current;
+    baseTiles.current.remove();
+    baseTiles.current = L.tileLayer(
+      props.layerOptions?.highContrast
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: props.layerOptions?.highContrast ? "&copy; CARTO &copy; OpenStreetMap" : "&copy; OpenStreetMap" },
+    ).addTo(m);
+  }, [L, props.layerOptions?.highContrast]);
+
   // Handle focus changes (Place search or GPS jump)
   useEffect(() => {
     if (!map.current || !props.focus) return;
+    if (isNaN(props.focus.lat) || isNaN(props.focus.lng)) return;
     map.current.flyTo([props.focus.lat, props.focus.lng], props.focus.zoom ?? 15, {
       duration: 1.0,
     });
   }, [props.focus]);
 
-  // Clean soft heat overlay: only renders risk colors where risk > 0!
+  // Clean soft heat overlay: only renders risk colors where risk > 0
   useEffect(() => {
     if (!L || !map.current) return;
     const m = map.current;
@@ -200,6 +230,7 @@ export default function FloodMap(props: FloodMapProps) {
     }
 
     for (const t of props.tiles) {
+      if (isNaN(t.centerLat) || isNaN(t.centerLng)) continue;
       const hasRisk = t.currentSeverityScore >= 20 || t.closure !== undefined;
       const isSelected = props.selectedTileId === t.id || props.selectedTileIds?.has(t.id);
 
@@ -235,12 +266,13 @@ export default function FloodMap(props: FloodMapProps) {
         rects.current.set(t.id, r);
       }
 
-      const color = RISK_HEX[t.currentRiskLevel];
+      const color = props.layerOptions?.highContrast
+        ? ({ Low: "#00ff88", Moderate: "#ffff00", High: "#ff6600", Critical: "#ff0033" } as Record<RiskLevel, string>)[t.currentRiskLevel] || "#00ff88"
+        : RISK_HEX[t.currentRiskLevel] || "#10b981";
       const isDimmed =
         props.onlyHighCritical &&
         (t.currentRiskLevel === "Low" || t.currentRiskLevel === "Moderate");
 
-      // Soft natural heat opacity
       let fillOpacity = 0;
       if (t.currentRiskLevel === "Moderate") fillOpacity = 0.25;
       else if (t.currentRiskLevel === "High") fillOpacity = 0.42;
@@ -295,7 +327,7 @@ export default function FloodMap(props: FloodMapProps) {
     currentZoom,
   ]);
 
-  // Roads overlay: only highlights risky or closed roads! Normal roads stay pristine
+  // Roads overlay: only highlights risky or closed roads
   useEffect(() => {
     if (!L) return;
     const g = layers.current.corridors;
@@ -310,27 +342,38 @@ export default function FloodMap(props: FloodMapProps) {
       const evalResult = evaluateOsmRoadRisk(road, tileMap, props.incidents, props.reports);
       const { riskLevel, severityScore, reason } = evalResult;
 
-      // Clean map design: do NOT draw normal/low-risk roads green
-      if (riskLevel === "Low" || riskLevel === "Unassessed") continue;
+      if (riskLevel === "Unassessed") continue;
 
-      let strokeColor = "#eab308";
-      let weight = currentZoom < 15 ? 3.5 : 4.5;
-      let opacity = 0.9;
+      // Clean map hierarchy:
+      // At overview zooms (< 14.5), show major arterial corridors for clear road passability.
+      // Minor residential alleys appear when zooming into street level (>= 14.5).
+      // All hazards (Moderate, High, Critical, Closed) are ALWAYS displayed at any zoom level.
+      if (riskLevel === "Low" && !road.isMajor && currentZoom < 14.5) {
+        continue;
+      }
+
+      let strokeColor = "#10b981";
+      let weight = currentZoom < 14.5 ? 2.4 : 2;
+      let opacity = currentZoom < 14.5 ? 0.55 : 0.65;
       let dashArray: string | undefined = undefined;
 
       if (riskLevel === "Closed") {
-        strokeColor = "#b91c1c";
-        weight = 5.5;
+        strokeColor = "#991b1b";
+        weight = 5;
         opacity = 1.0;
         dashArray = "6, 6";
       } else if (riskLevel === "Critical") {
         strokeColor = "#dc2626";
-        weight = 5.0;
+        weight = 4.5;
         opacity = 0.95;
       } else if (riskLevel === "High") {
         strokeColor = "#ea580c";
-        weight = 4.2;
-        opacity = 0.95;
+        weight = 3.6;
+        opacity = 0.9;
+      } else if (riskLevel === "Moderate") {
+        strokeColor = "#f59e0b";
+        weight = 3;
+        opacity = 0.85;
       }
 
       const line = L.polyline(road.coordinates, {
@@ -368,7 +411,9 @@ export default function FloodMap(props: FloodMapProps) {
         L.DomEvent.stopPropagation(e);
         if (road.tileIds.length > 0) {
           const t = tileMap.get(road.tileIds[0]);
-          if (t) propsRef.current.onTileClick(t.id, t.centerLat, t.centerLng);
+          if (t && !isNaN(t.centerLat) && !isNaN(t.centerLng)) {
+            propsRef.current.onTileClick(t.id, t.centerLat, t.centerLng);
+          }
         }
       });
     }
@@ -384,9 +429,29 @@ export default function FloodMap(props: FloodMapProps) {
     if (props.layerOptions?.showClosures === false) return;
 
     for (const i of props.incidents) {
+      let lat = (i as { lat?: number }).lat;
+      let lng = (i as { lng?: number }).lng;
+
+      // Fallback: derive coordinates from tileId if missing
+      if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+        const t = props.tiles.find((tile) => tile.id === i.tileId);
+        if (t && !isNaN(t.centerLat) && !isNaN(t.centerLng)) {
+          lat = t.centerLat;
+          lng = t.centerLng;
+        } else if (i.tileId && i.tileId.startsWith("t_")) {
+          const parts = i.tileId.slice(2).split("_").map(Number);
+          if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+            lat = 19.04 + (parts[0] + 0.5) * 0.0009;
+            lng = 72.86 + (parts[1] + 0.5) * 0.00095;
+          }
+        }
+      }
+
+      if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) continue;
+
       const label =
         i.status === "ClosedAllTraffic" ? "⛔" : i.status === "ClosedSmallVehicles" ? "🚫" : "⚠️";
-      const marker = L.marker([i.lat, i.lng], {
+      const marker = L.marker([lat, lng], {
         interactive: true,
         zIndexOffset: 500,
         icon: L.divIcon({
@@ -399,10 +464,10 @@ export default function FloodMap(props: FloodMapProps) {
 
       marker.on("click", (e) => {
         L.DomEvent.stopPropagation(e);
-        propsRef.current.onTileClick(i.tileId, i.lat, i.lng);
+        propsRef.current.onTileClick(i.tileId, lat!, lng!);
       });
     }
-  }, [L, props.incidents, props.layerOptions?.showClosures]);
+  }, [L, props.incidents, props.tiles, props.layerOptions?.showClosures]);
 
   // Crowdsourced Report markers
   useEffect(() => {
@@ -426,10 +491,21 @@ export default function FloodMap(props: FloodMapProps) {
       if (r.status === "Dismissed") continue;
       if (mode === "unverified" && r.status !== "Unverified") continue;
 
+      let lat = r.lat;
+      let lng = r.lng;
+      if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+        const t = props.tiles.find((tile) => tile.id === r.tileId);
+        if (t && !isNaN(t.centerLat) && !isNaN(t.centerLng)) {
+          lat = t.centerLat;
+          lng = t.centerLng;
+        }
+      }
+      if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) continue;
+
       const iconEmoji = ICONS[r.severityUser] || "💧";
       const isVerified = r.status === "Verified";
 
-      const marker = L.marker([r.lat, r.lng], {
+      const marker = L.marker([lat, lng], {
         interactive: true,
         zIndexOffset: 300,
         icon: L.divIcon({
@@ -444,10 +520,10 @@ export default function FloodMap(props: FloodMapProps) {
 
       marker.on("click", (e) => {
         L.DomEvent.stopPropagation(e);
-        propsRef.current.onTileClick(r.tileId, r.lat, r.lng);
+        propsRef.current.onTileClick(r.tileId, lat!, lng!);
       });
     }
-  }, [L, props.reports, props.showReports, props.layerOptions?.showReports]);
+  }, [L, props.reports, props.tiles, props.showReports, props.layerOptions?.showReports]);
 
   // Shelters markers
   useEffect(() => {
@@ -458,20 +534,47 @@ export default function FloodMap(props: FloodMapProps) {
 
     if (props.layerOptions?.showShelters === false) return;
 
+    // Spatial decimation at overview zooms (< 7) to avoid marker clumps across India while preserving even national distribution
+    const renderedCoords: [number, number][] = [];
+    const minDistanceDegrees = currentZoom < 4.5 ? 2.0 : currentZoom < 6 ? 1.2 : currentZoom < 7.5 ? 0.45 : 0;
+
     for (const s of props.shelters) {
+      if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) continue;
+
       const isHighlighted = props.highlightShelterId === s.id;
+
+      if (!isHighlighted && minDistanceDegrees > 0) {
+        const tooClose = renderedCoords.some(
+          ([rLat, rLng]) => Math.hypot(s.lat - rLat, s.lng - rLng) < minDistanceDegrees,
+        );
+        if (tooClose) continue;
+      }
+      renderedCoords.push([s.lat, s.lng]);
+
+      const size = isHighlighted ? 36 : currentZoom < 6 ? 16 : currentZoom < 9 ? 22 : 26;
+      const anchor = size / 2;
+
       const marker = L.marker([s.lat, s.lng], {
         interactive: true,
         zIndexOffset: isHighlighted ? 1200 : 250,
         icon: L.divIcon({
           className: "sf-icon",
-          html: `<span class="sf-shelter cursor-pointer hover:scale-110 transition-transform ${
+          html: `<span class="sf-shelter cursor-pointer hover:scale-125 transition-transform ${
             isHighlighted ? "is-hl shadow-lg ring-2 ring-white" : ""
-          }" title="${s.name} (${s.capacityStatus})">⌂</span>`,
-          iconSize: isHighlighted ? [36, 36] : [26, 26],
-          iconAnchor: isHighlighted ? [18, 18] : [13, 13],
+          }" style="width:${size}px;height:${size}px;font-size:${size > 20 ? 12 : 9}px;line-height:${size}px;" title="${s.name} (${s.capacityStatus})">⌂</span>`,
+          iconSize: [size, size],
+          iconAnchor: [anchor, anchor],
         }),
       }).addTo(g);
+
+      marker.bindTooltip(
+        `<div class="p-1 text-xs font-sans">
+          <strong>${s.name}</strong><br/>
+          <span style="color:#64748b; font-size:11px;">${s.address}</span><br/>
+          <span class="font-bold text-emerald-600">${s.capacityStatus}</span>
+        </div>`,
+        { sticky: true },
+      );
 
       marker.on("click", (e) => {
         L.DomEvent.stopPropagation(e);
@@ -481,9 +584,11 @@ export default function FloodMap(props: FloodMapProps) {
 
     if (props.highlightShelterId) {
       const s = props.shelters.find((x) => x.id === props.highlightShelterId);
-      if (s) map.current?.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
+      if (s && !isNaN(s.lat) && !isNaN(s.lng)) {
+        map.current?.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
+      }
     }
-  }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters]);
+  }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters, currentZoom]);
 
   // Safe road route polyline
   useEffect(() => {
@@ -495,7 +600,11 @@ export default function FloodMap(props: FloodMapProps) {
     if (props.layerOptions?.showEvacuationRoute === false) return;
 
     if (props.roadRouteCoords && props.roadRouteCoords.length > 0) {
-      const pts = props.roadRouteCoords;
+      const pts = props.roadRouteCoords.filter(
+        (p) => Array.isArray(p) && p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]),
+      );
+      if (pts.length < 2) return;
+
       const isImpassable = props.roadRouteSafety === "Impassable";
       const routeColor = isImpassable ? "#dc2626" : "#059669";
 
@@ -516,6 +625,20 @@ export default function FloodMap(props: FloodMapProps) {
         dashArray: isImpassable ? "8, 8" : undefined,
         interactive: false,
       }).addTo(g);
+
+      // Auto-fit map viewport to frame the complete safe evacuation route
+      try {
+        const routeBounds = L.latLngBounds(pts);
+        if (routeBounds.isValid()) {
+          map.current?.fitBounds(routeBounds.pad(0.22), {
+            animate: true,
+            duration: 0.8,
+            maxZoom: 16,
+          });
+        }
+      } catch {
+        // Fallback
+      }
     }
   }, [L, props.roadRouteCoords, props.roadRouteSafety, props.layerOptions?.showEvacuationRoute]);
 
@@ -525,7 +648,7 @@ export default function FloodMap(props: FloodMapProps) {
     const g = layers.current.user;
     if (!g) return;
     g.clearLayers();
-    if (props.userPos) {
+    if (props.userPos && !isNaN(props.userPos[0]) && !isNaN(props.userPos[1])) {
       L.marker(props.userPos, {
         interactive: false,
         zIndexOffset: 1100,

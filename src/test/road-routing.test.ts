@@ -97,7 +97,7 @@ describe("Road-Based Evacuation Routing Engine", () => {
       state.incidents,
     );
 
-    expect(candidates.length).toBe(SHELTERS.length);
+    expect(candidates.length).toBe(Math.min(SHELTERS.length, 8));
     expect(recommended).toBeDefined();
 
     // Recommended shelter must have an acceptable safe or caution route, NOT impassable
@@ -149,5 +149,24 @@ describe("Road-Based Evacuation Routing Engine", () => {
     expect(fallback.distanceKm).toBeGreaterThan(0.5);
     expect(fallback.durationMinutes).toBeGreaterThan(0);
     expect(fallback.steps.length).toBeGreaterThan(0);
+  });
+
+  it("applies mode-specific water-clearance thresholds", () => {
+    const coords: [number, number][] = [[19.05, 72.87]];
+    const report = (severityUser: FloodReport["severityUser"]): FloodReport => ({
+      id: `mode-${severityUser}`,
+      tileId: "outside-grid",
+      lat: 19.05,
+      lng: 72.87,
+      description: "Reported water depth",
+      severityUser,
+      createdAt: new Date().toISOString(),
+      status: "Verified",
+    });
+
+    expect(evaluateRouteRisk(coords, [], [report("Knees")], [], "twowheeler").safetyStatus).toBe("Impassable");
+    expect(evaluateRouteRisk(coords, [], [report("Knees")], [], "car").safetyStatus).not.toBe("Impassable");
+    expect(evaluateRouteRisk(coords, [], [report("WaistPlus")], [], "heavyRescue").safetyStatus).not.toBe("Impassable");
+    expect(evaluateRouteRisk(coords, [], [report("Knees")], [], "pedestrian").safetyStatus).toBe("Impassable");
   });
 });

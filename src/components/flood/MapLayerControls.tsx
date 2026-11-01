@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, X } from "lucide-react";
+import { Layers, X, Sun } from "lucide-react";
 import type { MapLayerOptions } from "@/lib/flood/types";
 
 interface MapLayerControlsProps {
@@ -19,11 +19,11 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
   };
 
   return (
-    <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20">
+    <div className="absolute right-3 top-20 z-20 sm:right-4 sm:top-24">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center justify-center gap-1.5 h-9 w-9 sm:h-auto sm:w-auto sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shrink-0"
+        className="flex h-11 w-11 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 text-xs font-bold text-slate-800 shadow-md backdrop-blur-md transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200 dark:hover:bg-slate-800 sm:h-auto sm:w-auto sm:px-3 sm:py-2"
         title="Map Layer Visibility"
         aria-label="Toggle map layer visibility controls"
       >
@@ -38,7 +38,7 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               aria-label="Close layers menu"
             >
               <X className="h-3.5 w-3.5" />
@@ -46,6 +46,18 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
           </div>
 
           {/* Technical Grid Toggle (Feature 5) */}
+          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <Sun className="h-3.5 w-3.5" /> High-contrast emergency view
+            </div>
+            <input
+              type="checkbox"
+              checked={options.highContrast ?? false}
+              onChange={() => toggle("highContrast")}
+              className="h-4 w-4 rounded-sm border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+            />
+          </label>
+
           <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
             <div className="space-y-0.5">
               <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">

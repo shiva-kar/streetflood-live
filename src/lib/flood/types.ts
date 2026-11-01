@@ -5,7 +5,7 @@ export type WaterDepth = "Footpath" | "Ankles" | "Knees" | "WaistPlus";
 export type ReportStatus = "Unverified" | "Verified" | "Dismissed";
 export type IncidentStatus = "PartiallyFlooded" | "ClosedSmallVehicles" | "ClosedAllTraffic";
 export type AlertSeverity = "Info" | "Warning" | "Critical";
-export type AlertType = "Municipal" | "PredictiveSimulated";
+export type AlertType = "Municipal" | "Predictive";
 export type AlertStatus = "Draft" | "Published" | "Archived";
 
 /** Static per-tile attributes (seeded, simulated). */
@@ -58,6 +58,8 @@ export interface RoadIncident {
   tileId: string;
   status: IncidentStatus;
   description: string;
+  lat?: number;
+  lng?: number;
   photoUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -85,9 +87,17 @@ export interface Shelter {
   lng: number;
   kind: "School" | "Community Hall" | "Municipal Building";
   capacityStatus: "Space available" | "Filling up" | "Near capacity";
-  provenance?: "Official Verified" | "Community Reported" | "Simulated Demo";
+  provenance?: "Official Verified" | "Community Reported" | "OpenStreetMap Public Data" | "Simulated Demo";
   accessibilityNote?: string;
+  ward?: string;
+  contactPhone?: string;
+  drinkingWater?: boolean;
+  medicalAid?: boolean;
+  wheelchairAccessible?: boolean;
+  petFriendly?: boolean;
 }
+
+export type EvacuationMode = "pedestrian" | "twowheeler" | "car" | "heavyRescue";
 
 export interface RoadRouteStep {
   instruction: string;
@@ -132,6 +142,7 @@ export interface MapLayerOptions {
   showShelters: boolean;
   showEvacuationRoute: boolean;
   showReports: boolean;
+  highContrast?: boolean;
 }
 
 export interface RoadSegment {

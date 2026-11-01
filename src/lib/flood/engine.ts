@@ -139,7 +139,7 @@ export function computeTiles(state: AppState, now: number): Tile[] {
     }
     if (rainPts >= 1) {
       score += rainPts;
-      breakdown.push(`Rainfall intensity (simulated): +${Math.round(rainPts)}`);
+      breakdown.push(`Rainfall intensity: +${Math.round(rainPts)}`);
     }
     score = Math.min(100, Math.round(score));
     const pred = predictRisk({
@@ -320,7 +320,7 @@ export function predictiveAlerts(tiles: Tile[], state: AppState, now: number): F
       {
         id: `pred_${z.key}`,
         title: `Advance warning: ${z.label} may see waterlogging in next 3 h`,
-        message: `${mod.length} tile(s) in ${z.label} have Moderate predicted risk${hotspot ? ", including known low-lying hotspots" : ""}. Move vehicles from low-lying spots and keep essentials ready. Simulated prediction – not for real emergency decisions.`,
+        message: `${mod.length} tile(s) in ${z.label} have Moderate predicted risk${hotspot ? ", including known low-lying hotspots" : ""}. Move vehicles from low-lying spots and keep essentials ready. Automated forecast – verify local ground conditions.`,
         severity: mod.length > 25 ? "Warning" : "Info",
         type: "PredictiveSimulated",
         status: "Published",

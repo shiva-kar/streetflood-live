@@ -73,63 +73,7 @@ export function buildTiles(): TileBase[] {
   return out;
 }
 
-export const SHELTERS: Shelter[] = [
-  {
-    id: "sh1",
-    name: "Demo Shelter A – Municipal School",
-    address: "Sion East / SIES College Area (simulated)",
-    lat: 19.0455,
-    lng: 72.8655,
-    kind: "School",
-    capacityStatus: "Space available",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Ground-floor ramp access; emergency medical desk (simulated)",
-  },
-  {
-    id: "sh2",
-    name: "Demo Shelter B – Community Hall",
-    address: "Chunabhatti East (simulated)",
-    lat: 19.0478,
-    lng: 72.879,
-    kind: "Community Hall",
-    capacityStatus: "Filling up",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Elevated community hall; food and dry relief point (simulated)",
-  },
-  {
-    id: "sh3",
-    name: "Demo Shelter C – Ward Office Annexe",
-    address: "Kurla West, off LBS Marg (simulated)",
-    lat: 19.0585,
-    lng: 72.8745,
-    kind: "Municipal Building",
-    capacityStatus: "Space available",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Municipal administration building; high elevation (simulated)",
-  },
-  {
-    id: "sh4",
-    name: "Demo Shelter D – Secondary School",
-    address: "Kurla West / CST Road corridor (simulated)",
-    lat: 19.0565,
-    lng: 72.8715,
-    kind: "School",
-    capacityStatus: "Near capacity",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Multi-story education complex; emergency bedding (simulated)",
-  },
-  {
-    id: "sh5",
-    name: "Demo Shelter E – Community Centre",
-    address: "Sion–Kurla link road (simulated)",
-    lat: 19.0515,
-    lng: 72.8712,
-    kind: "Community Hall",
-    capacityStatus: "Space available",
-    provenance: "Simulated Demo",
-    accessibilityNote: "Direct access from elevated link road corridor (simulated)",
-  },
-];
+export { COMPREHENSIVE_SHELTERS as SHELTERS } from "./sheltersDatabase";
 
 export interface StaticRoadCorridor {
   id: string;
@@ -215,7 +159,7 @@ export const EMERGENCY_CONTACTS = [
   {
     label: "City disaster control room",
     number: "1916",
-    note: "Demo listing – confirm with your municipality",
+    note: "BMC Disaster Management Helpline",
   },
 ];
 
@@ -264,7 +208,6 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 18),
       status: "Verified",
       reviewedAt: ago(now, 10),
-      photoUrl: `${import.meta.env.BASE_URL}images/demo-flood-1.jpg`,
     },
     {
       id: "r2",
@@ -296,7 +239,6 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 12),
       status: "Verified",
       reviewedAt: ago(now, 6),
-      photoUrl: `${import.meta.env.BASE_URL}images/demo-flood-2.jpg`,
     },
     {
       id: "r5",
@@ -365,7 +307,9 @@ export function seedState(now: number): AppState {
       id: "i1",
       tileId: tileId(20, 16),
       status: "ClosedAllTraffic",
-      description: "Subway closed due to waterlogging (demo incident).",
+      description: "Subway closed due to heavy waterlogging. Traffic diverted via SCLR.",
+      lat: GRID.south + (20 + 0.5) * GRID.dLat,
+      lng: GRID.west + (16 + 0.5) * GRID.dLng,
       createdAt: ago(now, 8),
       updatedAt: ago(now, 8),
       createdBy: "Authority",
@@ -374,39 +318,15 @@ export function seedState(now: number): AppState {
       id: "i2",
       tileId: tileId(2, 4),
       status: "ClosedSmallVehicles",
-      description: "Closed to two-wheelers and autos near the circle (demo).",
+      description: "Closed to two-wheelers and autos near Sion Circle. Follow officer signals.",
+      lat: GRID.south + (2 + 0.5) * GRID.dLat,
+      lng: GRID.west + (4 + 0.5) * GRID.dLng,
       createdAt: ago(now, 9),
       updatedAt: ago(now, 9),
       createdBy: "Authority",
     },
   ];
-  const alerts: FloodAlert[] = [
-    {
-      id: "a1",
-      title: "Subway closed – Kurla West",
-      message:
-        "The subway near Kurla station is closed to all traffic due to waterlogging. Use the alternate link road. (Demo alert)",
-      severity: "Critical",
-      type: "Municipal",
-      status: "Published",
-      tileIds: [tileId(20, 16), tileId(19, 16), tileId(20, 17)],
-      wardLabel: "Kurla West",
-      createdAt: ago(now, 8),
-      publishedAt: ago(now, 8),
-    },
-    {
-      id: "a2",
-      title: "Waterlogging near Sion Circle",
-      message: "Knee-deep water reported. Two-wheelers advised to avoid the stretch. (Demo alert)",
-      severity: "Warning",
-      type: "Municipal",
-      status: "Published",
-      tileIds: [tileId(2, 4), tileId(3, 4), tileId(3, 5)],
-      wardLabel: "Sion",
-      createdAt: ago(now, 9),
-      publishedAt: ago(now, 9),
-    },
-  ];
+  const alerts: FloodAlert[] = [];
   return {
     version: 1,
     reports,
