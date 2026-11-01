@@ -33,6 +33,7 @@ create table if not exists public.flood_reports (
   lat double precision not null check (lat between -90 and 90),
   lng double precision not null check (lng between -180 and 180),
   geom geography(Point, 4326),
+  water_depth text,
   depth_category text not null,
   water_depth_cm numeric(6,2) not null check (water_depth_cm >= 0),
   photo_storage_path text,
@@ -42,6 +43,7 @@ create table if not exists public.flood_reports (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.flood_reports add column if not exists geom geography(Point, 4326);
 alter table public.flood_reports add column if not exists depth_category text;
 alter table public.flood_reports add column if not exists water_depth_cm numeric(6,2);
 alter table public.flood_reports add column if not exists photo_storage_path text;
@@ -49,7 +51,7 @@ alter table public.flood_reports add column if not exists trust_score numeric(4,
 alter table public.flood_reports add column if not exists updated_at timestamptz default now();
 update public.flood_reports
 set
-  depth_category = coalesce(depth_category, water_depth::text),
+  depth_category = coalesce(nullif(depth_category, ''), water_depth::text, 'Footpath'),
   water_depth_cm = coalesce(water_depth_cm, case water_depth::text
     when 'Footpath' then 5 when 'Ankles' then 10 when 'Knees' then 20 when 'WaistPlus' then 40 else 0 end),
   geom = coalesce(geom, st_setsrid(st_makepoint(lng, lat), 4326)::geography),
@@ -317,6 +319,41 @@ returns boolean language sql security definer stable as $$
         else 1
       end
   );
+$$;
+
+create or replace function public.nearby_enterprise_shelters(
+  latitude double precision,
+  longitude double precision,
+  radius_meters double precision default 5000
+)
+returns table (
+  id uuid,
+  name text,
+  address text,
+  ward_code text,
+  distance_meters double precision,
+  available_capacity integer,
+  amenities_json jsonb
+)
+language sql
+security invoker
+stable
+as $$
+  select
+    shelter.id,
+    shelter.name,
+    shelter.address,
+    shelter.ward_code,
+    st_distance(shelter.geom, st_setsrid(st_makepoint(longitude, latitude), 4326)::geography),
+    shelter.total_capacity - shelter.current_headcount,
+    shelter.amenities_json
+  from public.emergency_shelters shelter
+  where st_dwithin(
+    shelter.geom,
+    st_setsrid(st_makepoint(longitude, latitude), 4326)::geography,
+    radius_meters
+  )
+  order by shelter.geom <-> st_setsrid(st_makepoint(longitude, latitude), 4326)::geography;
 $$;
 
 comment on schema public is 'StreetFlood Live enterprise spatial and disaster operations foundation';

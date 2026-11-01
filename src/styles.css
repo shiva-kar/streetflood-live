@@ -2,6 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 @import "leaflet/dist/leaflet.css";
+@import "./components/ui/highContrastTheme.css";
 
 @custom-variant dark (&:is(.dark *));
 
