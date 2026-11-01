@@ -15,6 +15,15 @@ export interface SensorTelemetryPacket {
   tamperAlert: boolean;
 }
 
+export type SensorTransport = "mqtt" | "coap" | "http";
+
+export function parseTransportPayload(input: unknown, transport: SensorTransport): SensorTelemetryPacket {
+  if (transport === "http") return parseSensorTelemetry(input);
+  if (!input || typeof input !== "object") throw new Error(`${transport.toUpperCase()} telemetry payload must be an object.`);
+  const envelope = input as { payload?: unknown; data?: unknown };
+  return parseSensorTelemetry(envelope.payload ?? envelope.data ?? input);
+}
+
 export function parseSensorTelemetry(input: unknown): SensorTelemetryPacket {
   if (!input || typeof input !== "object") throw new Error("Telemetry packet must be an object.");
   const packet = input as Record<string, unknown>;

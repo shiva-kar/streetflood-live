@@ -12,6 +12,13 @@ export function calculateTrustScore(signals: TrustSignals) {
   return Number(Math.max(0, Math.min(1, 0.2 + tenure + proximity + consensus)).toFixed(3));
 }
 
+export function decaySeverityScore(score: number, createdAt: string, now = new Date(), halfLifeHours = 4) {
+  if (!Number.isFinite(score) || score < 0) throw new Error("Severity score must be non-negative.");
+  if (halfLifeHours <= 0) throw new Error("Decay half-life must be positive.");
+  const ageHours = Math.max(0, now.getTime() - Date.parse(createdAt)) / 3_600_000;
+  return Number((score * Math.pow(0.5, ageHours / halfLifeHours)).toFixed(3));
+}
+
 export function clusterReports<T extends { lat: number; lng: number; createdAt: string }>(
   reports: T[],
   radiusMeters = 50,

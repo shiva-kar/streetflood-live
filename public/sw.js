@@ -1,6 +1,6 @@
 const TILE_CACHE = "streetflood-osm-v1";
 const WEATHER_CACHE = "streetflood-weather-v1";
-const MAX_TILES = 500;
+const MAX_TILES = 2000;
 const TILE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const WEATHER_MAX_AGE = 5 * 60 * 1000;
 

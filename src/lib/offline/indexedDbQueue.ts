@@ -45,3 +45,20 @@ export async function removeOfflineOperation(id: string) {
     request.onerror = () => reject(request.error);
   });
 }
+
+export async function flushOfflineOperations(
+  send: (operation: OfflineOperation) => Promise<void>,
+) {
+  const operations = await listOfflineOperations();
+  const results = { synced: 0, failed: 0 };
+  for (const operation of operations.sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    try {
+      await send(operation);
+      await removeOfflineOperation(operation.id);
+      results.synced++;
+    } catch {
+      results.failed++;
+    }
+  }
+  return results;
+}
