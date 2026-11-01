@@ -353,9 +353,12 @@ export async function calculateWorldwideSafeRoute(
       for (const bp of blockedPoints) {
         // Find minimum distance from any route coordinate to blocked point
         for (const coord of coords) {
-          const dLat = coord[0] - bp.lat;
-          const dLng = coord[1] - bp.lng;
-          const distKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
+          const dLat = ((coord[0] - bp.lat) * Math.PI) / 180;
+          const dLng = ((coord[1] - bp.lng) * Math.PI) / 180;
+          const lat1 = (coord[0] * Math.PI) / 180;
+          const lat2 = (bp.lat * Math.PI) / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+          const distKm = 6371 * 2 * Math.asin(Math.sqrt(a));
           if (distKm < 0.12) {
             // within ~120 meters
             blockedClosure = {

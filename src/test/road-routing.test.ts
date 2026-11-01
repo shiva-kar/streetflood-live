@@ -167,5 +167,6 @@ describe("Road-Based Evacuation Routing Engine", () => {
     expect(evaluateRouteRisk(coords, [], [report("Knees")], [], "twowheeler").safetyStatus).toBe("Impassable");
     expect(evaluateRouteRisk(coords, [], [report("Knees")], [], "car").safetyStatus).not.toBe("Impassable");
     expect(evaluateRouteRisk(coords, [], [report("WaistPlus")], [], "heavyRescue").safetyStatus).not.toBe("Impassable");
+    expect(evaluateRouteRisk(coords, [], [report("Knees")], [], "pedestrian").safetyStatus).toBe("Impassable");
   });
 });

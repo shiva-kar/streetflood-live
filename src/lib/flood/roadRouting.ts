@@ -170,10 +170,10 @@ export function evaluateRouteRisk(
   const tileMap = new Map<string, Tile>(tiles.map((t) => [t.id, t]));
   const activeReports = reports.filter((r) => r.status !== "Dismissed");
   const modeLimits: Record<EvacuationMode, { depthCm: number; blockedRisks: RiskLevel[] }> = {
-    pedestrian: { depthCm: 20, blockedRisks: ["Critical"] },
+    pedestrian: { depthCm: 15, blockedRisks: ["Critical"] },
     twowheeler: { depthCm: 12, blockedRisks: ["High", "Critical"] },
-    car: { depthCm: 25, blockedRisks: ["High", "Critical"] },
-    heavyRescue: { depthCm: 55, blockedRisks: [] },
+    car: { depthCm: 22, blockedRisks: ["High", "Critical"] },
+    heavyRescue: { depthCm: 60, blockedRisks: [] },
   };
   const depthCm: Record<string, number> = { Footpath: 5, Ankles: 10, Knees: 20, WaistPlus: 40 };
   let clearanceExceeded = false;
@@ -236,10 +236,10 @@ export function evaluateRouteRisk(
 
   // Determine overall safety verdict
   const limits: Record<EvacuationMode, { maxRisk: RiskLevel; maxDepth: number }> = {
-    pedestrian: { maxRisk: "Moderate", maxDepth: 0.2 },
+    pedestrian: { maxRisk: "Moderate", maxDepth: 0.15 },
     twowheeler: { maxRisk: "Moderate", maxDepth: 0.12 },
-    car: { maxRisk: "Moderate", maxDepth: 0.25 },
-    heavyRescue: { maxRisk: "High", maxDepth: 0.55 },
+    car: { maxRisk: "Moderate", maxDepth: 0.22 },
+    heavyRescue: { maxRisk: "High", maxDepth: 0.6 },
   };
   const allowedRisk = limits[mode].maxRisk;
   const riskRank: Record<RiskLevel, number> = { Low: 0, Moderate: 1, High: 2, Critical: 3 };
