@@ -106,7 +106,12 @@ export default function StreetFloodApp() {
   // 1. Initial User Geolocation
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
+      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then((registration) => {
+        registration.sync?.register("streetflood-report-sync").catch(() => undefined);
+      }).catch(() => undefined);
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data?.type === "FLUSH_OFFLINE_REPORTS") window.dispatchEvent(new Event("online"));
+      });
     }
     setIsLocating(true);
     getCurrentUserGps()

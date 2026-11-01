@@ -171,7 +171,7 @@ export default function PreparednessModal({
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs sm:text-sm text-slate-500">
                 <span>Relief centers sorted by distance from current location:</span>
-                <span className="italic">Simulated for demo</span>
+                <span className="italic">Check current ward capacity before travel</span>
               </div>
 
               <div className="space-y-3">
