@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Sparkles, Loader2, AlertTriangle, Bell } from "lucide-react";
+import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Sparkles, Loader2, AlertTriangle, Bell, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,7 @@ import {
 import { searchPlaces, type PlaceSearchResult } from "@/lib/flood/openData";
 import { getLanguage, setLanguage, useI18n, type Language } from "@/lib/i18n";
 import type { UserProfile } from "@/lib/supabase/client";
+import { speakAlert } from "@/lib/flood/voiceAnnouncer";
 
 interface ProductionHeaderProps {
   onSelectPlace: (lat: number, lng: number, name: string) => void;
@@ -24,6 +25,7 @@ interface ProductionHeaderProps {
   onOpenAlerts?: () => void;
   onOpenHelp?: () => void;
   alertCount?: number;
+  criticalAlert?: string | undefined;
 }
 
 export default function ProductionHeader({
@@ -38,6 +40,7 @@ export default function ProductionHeader({
   onOpenAlerts,
   onOpenHelp,
   alertCount = 0,
+  criticalAlert,
 }: ProductionHeaderProps) {
   const t = useI18n();
   const [query, setQuery] = useState("");
@@ -216,6 +219,19 @@ export default function ProductionHeader({
               <span className="px-1.5 py-0.2 bg-red-600 text-white font-bold text-[8px] rounded-full">
                 {alertCount}
               </span>
+            )}
+            {criticalAlert && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => speakAlert(criticalAlert, currentLang)}
+                className="h-10 px-3 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm gap-1.5 text-xs font-semibold hidden md:inline-flex"
+                title="Listen to critical alert"
+              >
+                <Volume2 className="w-4 h-4 text-red-600" />
+                <span className="hidden lg:inline">Listen Alert</span>
+              </Button>
             )}
           </Button>
         )}

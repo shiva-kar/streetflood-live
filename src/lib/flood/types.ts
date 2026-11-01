@@ -5,7 +5,7 @@ export type WaterDepth = "Footpath" | "Ankles" | "Knees" | "WaistPlus";
 export type ReportStatus = "Unverified" | "Verified" | "Dismissed";
 export type IncidentStatus = "PartiallyFlooded" | "ClosedSmallVehicles" | "ClosedAllTraffic";
 export type AlertSeverity = "Info" | "Warning" | "Critical";
-export type AlertType = "Municipal" | "PredictiveSimulated";
+export type AlertType = "Municipal" | "Predictive";
 export type AlertStatus = "Draft" | "Published" | "Archived";
 
 /** Static per-tile attributes (seeded, simulated). */

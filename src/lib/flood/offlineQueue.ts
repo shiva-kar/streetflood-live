@@ -19,7 +19,7 @@ export async function flushOfflineReports(): Promise<number> {
         lng: report.lng,
         waterDepth: report.waterDepth,
         description: report.description,
-        photoDataUrl: report.photoUrl,
+        ...(report.photoUrl ? { photoDataUrl: report.photoUrl } : {}),
       });
       await clearQueuedReport(report.id);
       flushed += 1;

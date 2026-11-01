@@ -48,8 +48,36 @@ export default function ControlRoomModal({
   const [alertMessage, setAlertMessage] = useState("");
   const [alertSeverity, setAlertSeverity] = useState<"Critical" | "Warning" | "Info">("Critical");
   const [isSubmittingAlert, setIsSubmittingAlert] = useState(false);
+  const [lifecycle, setLifecycle] = useState<Record<string, number>>({});
+  const [resource, setResource] = useState<"pump" | "sandbags" | "rescueBoat">("pump");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookWard, setWebhookWard] = useState("L Ward");
 
   const pendingReports = reports.filter((r) => r.status === "Unverified");
+  const lifecycleSteps = ["Reported", "Dispatched to Ward Field Unit", "Drainage Pump Active", "Water Receding", "Cleared"];
+
+  const broadcastWardAlert = async () => {
+    if (!webhookUrl.trim()) {
+      toast.error("Enter a configured ward alert webhook URL.");
+      return;
+    }
+    try {
+      const response = await fetch(webhookUrl.trim(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ward: webhookWard,
+          severity: alertSeverity,
+          message: alertMessage || "Municipal flood response alert",
+          safeShelterUrl: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        }),
+      });
+      if (!response.ok) throw new Error(`Webhook returned ${response.status}`);
+      toast.success("Ward alert broadcast accepted by webhook.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ward alert webhook failed.");
+    }
+  };
 
   const downloadIncidentFeed = () => {
     const features = [
@@ -188,6 +216,38 @@ export default function ControlRoomModal({
               Broadcast Alert
             </TabsTrigger>
           </TabsList>
+
+          <div className="mt-3 rounded-xl border bg-muted/30 p-3 space-y-3">
+            <p className="text-xs font-bold">Incident lifecycle and field resources</p>
+            {incidents.slice(0, 3).map((incident) => {
+              const currentIndex = lifecycle[incident.id] ?? 0;
+              return (
+                <div key={incident.id} className="space-y-2 border-t pt-2">
+                  <p className="text-[11px] font-semibold">{incident.description}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {lifecycleSteps.map((step, index) => (
+                      <button key={step} type="button" onClick={() => setLifecycle((previous) => ({ ...previous, [incident.id]: index }))} className={`min-h-9 rounded-md border px-2 text-[10px] ${index <= currentIndex ? "border-emerald-600 bg-emerald-600 text-white" : "border-border text-muted-foreground"}`}>
+                        {step}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={resource} onValueChange={(value) => setResource(value as typeof resource)}>
+                      <SelectTrigger className="h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pump">Drainage pump</SelectItem>
+                        <SelectItem value="sandbags">Sandbags</SelectItem>
+                        <SelectItem value="rescueBoat">Rescue boat</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" size="sm" className="h-8 text-[11px]" onClick={() => toast.success(`${resource} assigned at ${incident.lat?.toFixed(5) ?? mapCenter[0].toFixed(5)}, ${incident.lng?.toFixed(5) ?? mapCenter[1].toFixed(5)}`)}>
+                      Assign at coordinates
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
           {/* TAB 1: MODERATION QUEUE */}
           <TabsContent value="moderation" className="space-y-3 pt-3">
@@ -377,6 +437,12 @@ export default function ControlRoomModal({
                 {isSubmittingAlert ? "Broadcasting..." : "Broadcast Alert to Everyone"}
               </Button>
             </form>
+            <div className="border-t pt-3 space-y-2">
+              <p className="text-xs font-bold">Broadcast Ward Alert via WhatsApp / SMS</p>
+              <Input value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} placeholder="Configured webhook URL" className="text-xs" />
+              <Input value={webhookWard} onChange={(event) => setWebhookWard(event.target.value)} placeholder="Ward" className="text-xs" />
+              <Button type="button" variant="outline" className="w-full text-xs" onClick={broadcastWardAlert}>Broadcast Ward Alert via WhatsApp / SMS</Button>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

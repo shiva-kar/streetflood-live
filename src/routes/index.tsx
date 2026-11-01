@@ -77,6 +77,7 @@ export default function StreetFloodApp() {
   const [liveReports, setLiveReports] = useState<FloodReport[]>(localState.reports);
   const [liveIncidents, setLiveIncidents] = useState<RoadIncident[]>(localState.incidents);
   const [liveAlerts, setLiveAlerts] = useState<FloodAlert[]>(localState.alerts);
+  const [offlineQueuedCount, setOfflineQueuedCount] = useState(0);
 
   // Map Layer Visibility Controls
   const [layerOptions, setLayerOptions] = useState<MapLayerOptions>({
@@ -145,6 +146,7 @@ export default function StreetFloodApp() {
     const syncOfflineQueue = async () => {
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
       const queued = await getQueuedOfflineReports();
+      setOfflineQueuedCount(queued.length);
       if (queued.length === 0) return;
 
       for (const rep of queued) {
@@ -154,7 +156,7 @@ export default function StreetFloodApp() {
             lng: rep.lng,
             waterDepth: rep.waterDepth,
             description: rep.description,
-            photoDataUrl: rep.photoUrl,
+            ...(rep.photoUrl ? { photoDataUrl: rep.photoUrl } : {}),
           });
           await clearQueuedReport(rep.id);
         } catch {
@@ -162,6 +164,7 @@ export default function StreetFloodApp() {
         }
       }
       toast.success("Synchronized offline flood reports with server.");
+      setOfflineQueuedCount((await getQueuedOfflineReports()).length);
     };
 
     syncOfflineQueue();
@@ -408,6 +411,9 @@ export default function StreetFloodApp() {
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenHelp={() => setHelpModalOpen(true)}
         alertCount={liveAlerts.length}
+        criticalAlert={liveAlerts.find((alert) => alert.severity === "Critical")?.message}
+        reports={liveReports}
+        offlineQueuedCount={offlineQueuedCount}
       />
 
       {/* 2. FULLSCREEN MAP */}
