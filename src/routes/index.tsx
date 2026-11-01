@@ -36,8 +36,9 @@ import {
 import { useAppState, getState, setState } from "@/lib/flood/store";
 import { MAP_CENTER, SHELTERS as INITIAL_SHELTERS } from "@/lib/flood/data";
 import { findNearestKnownShelters, getHaversineDistanceKm, formatDistanceString } from "@/lib/flood/sheltersDatabase";
-import type { FloodAlert, FloodReport, RoadIncident, Shelter, Tile } from "@/lib/flood/types";
+import type { EvacuationMode, FloodAlert, FloodReport, RoadIncident, Shelter, Tile } from "@/lib/flood/types";
 import { toast } from "sonner";
+import { getCurrentTideStatus } from "@/lib/flood/tideData";
 
 export const Route = createFileRoute("/")({
   component: StreetFloodApp,
@@ -85,12 +86,14 @@ export default function StreetFloodApp() {
     showClosures: true,
     showReports: true,
     showEvacuationRoute: true,
+    highContrast: false,
   });
 
   // Selection & Navigation
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"map" | "report" | "alerts" | "help">("map");
   const [roadRoute, setRoadRoute] = useState<Awaited<ReturnType<typeof calculateWorldwideSafeRoute>> | null>(null);
+  const [evacuationMode, setEvacuationMode] = useState<EvacuationMode>("car");
 
   // Modals & Drawers
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -101,6 +104,9 @@ export default function StreetFloodApp() {
 
   // 1. Initial User Geolocation
   useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
+    }
     setIsLocating(true);
     getCurrentUserGps()
       .then((res) => {
@@ -228,6 +234,29 @@ export default function StreetFloodApp() {
     );
   }, [viewportBounds, liveReports, liveIncidents, weather, now]);
 
+  useEffect(() => {
+    if (!weather) return;
+    const tide = getCurrentTideStatus(new Date(), weather.rainRateMmPerHour);
+    const critical = weather.rainRateMmPerHour > 25 || (tide.heightMeters > 4.2 && weather.rainRateMmPerHour > 15);
+    const id = "live-monsoon-tidal-warning";
+    setLiveAlerts((previous) => {
+      const withoutLive = previous.filter((alert) => alert.id !== id);
+      if (!critical) return withoutLive;
+      return [{
+        id,
+        title: "Critical Monsoon & Tidal Waterlogging Warning",
+        message: `Heavy rainfall of ${weather.rainRateMmPerHour.toFixed(1)} mm/h with a ${tide.heightMeters.toFixed(2)}m tide may reduce drainage capacity. Avoid low-lying stretches in L Ward and F-North Ward and use designated relief centres.`,
+        severity: "Critical",
+        type: "Municipal",
+        status: "Published",
+        tileIds: dynamicTiles.filter((tile) => tile.ward === "kurla-sw" || tile.ward === "sion").map((tile) => tile.id),
+        wardLabel: "L Ward • F-North Ward",
+        createdAt: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
+      }, ...withoutLive];
+    });
+  }, [weather, dynamicTiles]);
+
   // Selected tile object
   const currentTile = useMemo(() => {
     if (selectedTileId) {
@@ -315,7 +344,7 @@ export default function StreetFloodApp() {
       description: i.description,
     }));
 
-    const result = await calculateWorldwideSafeRoute(referenceCoord, [shelter.lat, shelter.lng], blocked);
+    const result = await calculateWorldwideSafeRoute(referenceCoord, [shelter.lat, shelter.lng], blocked, evacuationMode);
     toast.dismiss("routing");
     if (result) {
       setRoadRoute(result);
@@ -365,7 +394,7 @@ export default function StreetFloodApp() {
     demoMode;
 
   return (
-    <div className="relative w-full h-[100dvh] overflow-hidden flex flex-col bg-background select-none font-sans">
+    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col select-none font-sans ${layerOptions.highContrast ? "bg-[#0a0a0a] text-white" : "bg-background"}`}>
       {/* 1. TOP HEADER (SEARCH + GPS + PROFILE) */}
       <ProductionHeader
         onSelectPlace={handleSelectPlace}
@@ -429,6 +458,11 @@ export default function StreetFloodApp() {
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenHelp={() => setHelpModalOpen(true)}
         alertCount={liveAlerts.length}
+        evacuationMode={evacuationMode}
+        onEvacuationModeChange={(mode) => {
+          setEvacuationMode(mode);
+          if (nearestShelter) void handlePlanRouteToShelter(nearestShelter);
+        }}
       />
 
       {/* 4. BOTTOM 4-TAB NAVIGATION DOCK */}

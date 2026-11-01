@@ -328,33 +328,7 @@ export function seedState(now: number): AppState {
       createdBy: "Authority",
     },
   ];
-  const alerts: FloodAlert[] = [
-    {
-      id: "a1",
-      title: "Subway closed – Kurla West",
-      message:
-        "The subway near Kurla station is closed to all traffic due to waterlogging. Use the alternate link road.",
-      severity: "Critical",
-      type: "Municipal",
-      status: "Published",
-      tileIds: [tileId(20, 16), tileId(19, 16), tileId(20, 17)],
-      wardLabel: "Kurla West",
-      createdAt: ago(now, 8),
-      publishedAt: ago(now, 8),
-    },
-    {
-      id: "a2",
-      title: "Waterlogging near Sion Circle",
-      message: "Knee-deep water reported. Two-wheelers advised to avoid the stretch.",
-      severity: "Warning",
-      type: "Municipal",
-      status: "Published",
-      tileIds: [tileId(2, 4), tileId(3, 4), tileId(3, 5)],
-      wardLabel: "Sion",
-      createdAt: ago(now, 9),
-      publishedAt: ago(now, 9),
-    },
-  ];
+  const alerts: FloodAlert[] = [];
   return {
     version: 1,
     reports,

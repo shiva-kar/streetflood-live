@@ -72,8 +72,15 @@ export default function ThreeTapReportModal({
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compactUrl = await fileToCompactDataUrl(file, 640);
-      setPhotoDataUrl(compactUrl);
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1024 / bitmap.width, 1024 / bitmap.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const webp = canvas.toDataURL("image/webp", 0.8);
+      setPhotoDataUrl(webp.length <= 204800 ? webp : await fileToCompactDataUrl(file, 512));
+      bitmap.close();
     } catch {
       toast.error("Could not process photo. Please choose another image.");
     }
