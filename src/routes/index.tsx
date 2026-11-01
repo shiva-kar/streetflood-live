@@ -36,6 +36,7 @@ import {
 import { useAppState, getState, setState } from "@/lib/flood/store";
 import { MAP_CENTER, SHELTERS as INITIAL_SHELTERS } from "@/lib/flood/data";
 import { findNearestKnownShelters, getHaversineDistanceKm, formatDistanceString } from "@/lib/flood/sheltersDatabase";
+import { listenForOfflineFlush, registerStreetFloodServiceWorker } from "@/lib/offline/serviceWorkerRegistration";
 import type { EvacuationMode, FloodAlert, FloodReport, RoadIncident, Shelter, Tile } from "@/lib/flood/types";
 import { toast } from "sonner";
 import { getCurrentTideStatus } from "@/lib/flood/tideData";
@@ -105,14 +106,8 @@ export default function StreetFloodApp() {
 
   // 1. Initial User Geolocation
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then((registration) => {
-        registration.sync?.register("streetflood-report-sync").catch(() => undefined);
-      }).catch(() => undefined);
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        if (event.data?.type === "FLUSH_OFFLINE_REPORTS") window.dispatchEvent(new Event("online"));
-      });
-    }
+    registerStreetFloodServiceWorker(import.meta.env.BASE_URL).catch(() => undefined);
+    const stopOfflineListener = listenForOfflineFlush(() => window.dispatchEvent(new Event("online")));
     setIsLocating(true);
     getCurrentUserGps()
       .then((res) => {
@@ -125,6 +120,7 @@ export default function StreetFloodApp() {
       .finally(() => {
         setIsLocating(false);
       });
+    return stopOfflineListener;
   }, []);
 
   // 2. Fetch User Profile & Auth
@@ -402,7 +398,10 @@ export default function StreetFloodApp() {
     demoMode;
 
   return (
-    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col select-none font-sans ${layerOptions.highContrast ? "bg-[#0a0a0a] text-white" : "bg-background"}`}>
+    <div
+      data-high-contrast={layerOptions.highContrast ? "true" : "false"}
+      className={`relative w-full h-[100dvh] overflow-hidden flex flex-col select-none font-sans ${layerOptions.highContrast ? "bg-[#0a0a0a] text-white" : "bg-background"}`}
+    >
       {/* 1. TOP HEADER (SEARCH + GPS + PROFILE) */}
       <ProductionHeader
         onSelectPlace={handleSelectPlace}
