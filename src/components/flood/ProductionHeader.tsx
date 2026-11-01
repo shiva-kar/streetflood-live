@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Sparkles, Loader2, AlertTriangle, Bell, Volume2 } from "lucide-react";
+import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Loader2, AlertTriangle, Bell, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +21,7 @@ interface ProductionHeaderProps {
   onOpenAuth: () => void;
   onOpenControlRoom?: () => void;
   canAccessControlRoom: boolean;
-  demoMode: boolean;
+  demoMode?: boolean;
   onOpenAlerts?: () => void;
   onOpenHelp?: () => void;
   alertCount?: number;
@@ -36,7 +36,6 @@ export default function ProductionHeader({
   onOpenAuth,
   onOpenControlRoom,
   canAccessControlRoom,
-  demoMode,
   onOpenAlerts,
   onOpenHelp,
   alertCount = 0,
@@ -84,17 +83,17 @@ export default function ProductionHeader({
   };
 
   return (
-    <header className="relative z-30 w-full px-3 pt-3 pb-1.5 flex flex-col gap-2">
-      <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
+    <header className="relative z-30 w-full px-3 pt-3 pb-1.5 sm:px-4">
+      <div className="flex items-center gap-2 w-full">
         {/* LOGO & BRAND */}
-        <div className="flex items-center gap-2 shrink-0 bg-background/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border shadow-sm">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
+        <div className="flex items-center gap-2 shrink-0 rounded-xl border border-border bg-background/95 px-2.5 py-2 shadow-sm backdrop-blur-md sm:px-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
             SF
           </div>
-          <span className="font-bold text-sm tracking-tight text-foreground hidden sm:inline">
+          <span className="hidden text-sm font-bold tracking-tight text-foreground sm:inline">
             StreetFlood<span className="text-primary font-normal">.Live</span>
           </span>
-          <span className="text-[10px] text-muted-foreground font-semibold hidden md:inline ml-0.5 border-l border-border/80 pl-2">
+          <span className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground md:inline">
             Mumbai
           </span>
         </div>
@@ -116,7 +115,7 @@ export default function ProductionHeader({
                 }
               }}
               placeholder={t.searchPlaceholder}
-              className="pl-9 pr-8 h-10 rounded-2xl bg-background/95 backdrop-blur-md border shadow-sm text-xs sm:text-sm focus-visible:ring-1 focus-visible:ring-primary"
+              className="h-11 rounded-xl border border-border bg-background/95 pl-9 pr-8 text-xs shadow-sm backdrop-blur-md focus-visible:ring-1 focus-visible:ring-primary sm:text-sm"
             />
             {query ? (
               <button
@@ -163,7 +162,7 @@ export default function ProductionHeader({
           onClick={onLocateUser}
           disabled={isLocating}
           title={t.useMyLocation}
-          className="h-10 w-10 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hover:text-primary transition-colors"
+          className="h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hover:text-primary transition-colors"
         >
           {isLocating ? (
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -178,7 +177,7 @@ export default function ProductionHeader({
             <Button
               variant="outline"
               size="icon"
-              className="h-10 w-10 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hidden sm:inline-flex"
+              className="hidden h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm sm:inline-flex"
             >
               <Globe className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -211,7 +210,7 @@ export default function ProductionHeader({
             variant="outline"
             size="sm"
             onClick={onOpenAlerts}
-            className="h-10 px-3 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm gap-1.5 text-xs font-semibold hidden md:inline-flex relative cursor-pointer"
+            className="relative hidden h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md md:inline-flex"
           >
             <Bell className="w-4 h-4 text-primary" />
             <span className="hidden lg:inline">{t.tabAlerts}</span>
@@ -220,19 +219,19 @@ export default function ProductionHeader({
                 {alertCount}
               </span>
             )}
-            {criticalAlert && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => speakAlert(criticalAlert, currentLang)}
-                className="h-10 px-3 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm gap-1.5 text-xs font-semibold hidden md:inline-flex"
-                title="Listen to critical alert"
-              >
-                <Volume2 className="w-4 h-4 text-red-600" />
-                <span className="hidden lg:inline">Listen Alert</span>
-              </Button>
-            )}
+          </Button>
+        )}
+        {criticalAlert && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => speakAlert(criticalAlert, currentLang)}
+            className="hidden h-11 w-11 shrink-0 rounded-xl border border-border bg-background/95 shadow-sm backdrop-blur-md md:inline-flex"
+            title="Listen to critical alert"
+            aria-label="Listen to critical alert"
+          >
+            <Volume2 className="w-4 h-4 text-red-600" />
           </Button>
         )}
 
@@ -242,7 +241,7 @@ export default function ProductionHeader({
             variant="default"
             size="sm"
             onClick={onOpenHelp}
-            className="h-10 px-3.5 rounded-2xl shrink-0 bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm gap-1.5 hidden sm:inline-flex cursor-pointer"
+            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-red-700 px-3.5 text-xs font-bold text-white shadow-sm hover:bg-red-800 sm:inline-flex"
           >
             <AlertTriangle className="w-4 h-4" />
             <span>112 Help</span>
@@ -255,7 +254,7 @@ export default function ProductionHeader({
             variant="default"
             size="sm"
             onClick={onOpenControlRoom}
-            className="h-10 px-3 rounded-2xl shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm gap-1.5 hidden md:flex"
+            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-slate-800 px-3 text-xs font-semibold text-white shadow-sm hover:bg-slate-900 md:flex"
           >
             <ShieldCheck className="w-4 h-4" />
             {t.controlRoom}
@@ -267,7 +266,7 @@ export default function ProductionHeader({
           variant="outline"
           size="sm"
           onClick={onOpenAuth}
-          className="h-10 px-3 rounded-2xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm gap-1.5 text-xs font-semibold"
+          className="h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md"
         >
           <User className="w-4 h-4 text-muted-foreground" />
           <span className="hidden sm:inline">

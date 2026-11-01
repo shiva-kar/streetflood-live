@@ -22,14 +22,14 @@ export default function BottomNav({
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 left-0 right-0 z-40 h-14 bg-background/98 backdrop-blur-xl border-t border-border flex items-center justify-around px-3 pb-[max(0.25rem,env(safe-area-inset-bottom))] select-none"
+      className="fixed bottom-0 left-0 right-0 z-40 flex h-14 items-center justify-around border-t border-border bg-background/98 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl select-none sm:hidden"
       aria-label="Mobile Navigation"
     >
       {/* 1. MAP TAB */}
       <button
         type="button"
         onClick={() => onTabChange("map")}
-        className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors cursor-pointer ${
+        className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 transition-colors cursor-pointer ${
           activeTab === "map"
             ? "text-primary font-bold"
             : "text-muted-foreground hover:text-foreground font-medium"
@@ -46,7 +46,7 @@ export default function BottomNav({
           onTabChange("report");
           onOpenReport();
         }}
-        className="flex items-center justify-center h-10 px-3.5 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-95 transition-all gap-1.5 cursor-pointer font-bold text-xs"
+        className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-red-700 px-3.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 hover:bg-red-800 cursor-pointer"
         aria-label="Report Flood"
       >
         <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -60,7 +60,7 @@ export default function BottomNav({
           onTabChange("alerts");
           onOpenAlerts();
         }}
-        className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors relative cursor-pointer ${
+        className={`relative flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 transition-colors cursor-pointer ${
           activeTab === "alerts"
             ? "text-primary font-bold"
             : "text-muted-foreground hover:text-foreground font-medium"
@@ -84,7 +84,7 @@ export default function BottomNav({
           onTabChange("help");
           onOpenHelp();
         }}
-        className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 transition-colors cursor-pointer ${
+        className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 transition-colors cursor-pointer ${
           activeTab === "help"
             ? "text-primary font-bold"
             : "text-muted-foreground hover:text-foreground font-medium"

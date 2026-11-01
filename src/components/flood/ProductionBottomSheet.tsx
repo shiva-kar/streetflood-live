@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronUp,
   ChevronDown,
@@ -66,6 +66,18 @@ export default function ProductionBottomSheet({
   const [showTechnicalMath, setShowTechnicalMath] = useState(false);
   const [audioGuidance, setAudioGuidance] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    const updateOnlineState = () => setIsOnline(navigator.onLine);
+    updateOnlineState();
+    window.addEventListener("online", updateOnlineState);
+    window.addEventListener("offline", updateOnlineState);
+    return () => {
+      window.removeEventListener("online", updateOnlineState);
+      window.removeEventListener("offline", updateOnlineState);
+    };
+  }, []);
 
   const score = currentTile?.currentSeverityScore ?? 0;
   const closure = currentTile?.closure;
@@ -122,9 +134,9 @@ export default function ProductionBottomSheet({
                 {currentTile?.ward ? `${currentTile.ward} • ${civicStatus.headline}` : civicStatus.headline}
               </p>
             </div>
-            {typeof navigator !== "undefined" && !navigator.onLine && (
+            {!isOnline && (
               <div className="mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                Offline Mode • Queued {offlineQueuedCount || 1} report{offlineQueuedCount === 1 ? "" : "s"} for upload
+                Offline • {offlineQueuedCount || 1} report{offlineQueuedCount === 1 ? "" : "s"} queued
               </div>
             )}
           </div>
@@ -132,7 +144,7 @@ export default function ProductionBottomSheet({
           <div className="flex items-center gap-1.5 shrink-0">
             <Badge
               variant="outline"
-              className="text-[10px] font-bold px-2 py-0.5"
+            className="rounded-md px-2 py-0.5 text-[10px] font-bold"
               style={{ borderColor: civicStatus.colorHex, color: civicStatus.colorHex }}
             >
               Score {score}/100
@@ -203,15 +215,15 @@ export default function ProductionBottomSheet({
               <CloudRain className="w-4 h-4 text-sky-500 shrink-0" />
               <div>
                 <p className="font-semibold text-foreground">
-                  Live Rainfall: {weather.recentRainMm} mm/h
+                  Rainfall now: {weather.recentRainMm} mm/h
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Next 3 Hours Forecast: {weather.forecastRain3hMm} mm
+                  Next 3 hours: {weather.forecastRain3hMm} mm expected
                 </p>
               </div>
             </div>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300">
-              Open-Meteo
+              Live weather
             </span>
           </div>
         )}
@@ -220,7 +232,7 @@ export default function ProductionBottomSheet({
           <div>
             <p className="font-semibold text-foreground">Tide & Drainage Indicator</p>
             <p className="text-[11px] text-muted-foreground">
-              🌊 {tide.warningLevel === "Normal" ? "Normal tide" : tide.warningLevel}: {tide.heightMeters.toFixed(2)}m • {tide.trend}
+              {tide.warningLevel === "Normal" ? "Normal tide" : tide.warningLevel}: {tide.heightMeters.toFixed(2)} m • {tide.trend}
             </p>
           </div>
           <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">

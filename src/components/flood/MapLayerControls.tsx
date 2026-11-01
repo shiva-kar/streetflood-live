@@ -19,11 +19,11 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
   };
 
   return (
-    <div className="absolute top-16 right-3 sm:top-20 sm:right-4 z-20">
+    <div className="absolute right-3 top-20 z-20 sm:right-4 sm:top-24">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center justify-center gap-1.5 h-9 w-9 sm:h-auto sm:w-auto sm:px-3 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shrink-0"
+        className="flex h-11 w-11 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 text-xs font-bold text-slate-800 shadow-md backdrop-blur-md transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200 dark:hover:bg-slate-800 sm:h-auto sm:w-auto sm:px-3 sm:py-2"
         title="Map Layer Visibility"
         aria-label="Toggle map layer visibility controls"
       >
@@ -38,7 +38,7 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               aria-label="Close layers menu"
             >
               <X className="h-3.5 w-3.5" />

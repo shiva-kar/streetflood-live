@@ -345,26 +345,26 @@ export default function FloodMap(props: FloodMapProps) {
       }
 
       let strokeColor = "#10b981";
-      let weight = currentZoom < 15 ? 2.6 : 3.4;
-      let opacity = 0.65;
+      let weight = currentZoom < 14.5 ? 2.4 : 2;
+      let opacity = currentZoom < 14.5 ? 0.55 : 0.65;
       let dashArray: string | undefined = undefined;
 
       if (riskLevel === "Closed") {
         strokeColor = "#991b1b";
-        weight = 5.2;
+        weight = 5;
         opacity = 1.0;
         dashArray = "6, 6";
       } else if (riskLevel === "Critical") {
         strokeColor = "#dc2626";
-        weight = 4.6;
+        weight = 4.5;
         opacity = 0.95;
       } else if (riskLevel === "High") {
         strokeColor = "#ea580c";
-        weight = 3.8;
+        weight = 3.6;
         opacity = 0.9;
       } else if (riskLevel === "Moderate") {
         strokeColor = "#f59e0b";
-        weight = 3.2;
+        weight = 3;
         opacity = 0.85;
       }
 
