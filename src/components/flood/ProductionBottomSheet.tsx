@@ -14,13 +14,16 @@ import {
   Plus,
   Bell,
   LifeBuoy,
+  Volume2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getCivicSafetyStatus } from "@/lib/flood/dynamicGrid";
 import { useI18n } from "@/lib/i18n";
-import type { RoadRouteResult, Shelter, Tile } from "@/lib/flood/types";
+import type { EvacuationMode, RoadRouteResult, Shelter, Tile } from "@/lib/flood/types";
 import type { RealWeatherResult } from "@/lib/flood/openData";
+import { getCurrentTideStatus } from "@/lib/flood/tideData";
+import { speakTurnInstruction, cancelVoiceAnnouncements } from "@/lib/flood/voiceAnnouncer";
 
 interface ProductionBottomSheetProps {
   currentTile: Tile | null;
@@ -33,6 +36,8 @@ interface ProductionBottomSheetProps {
   onOpenAlerts?: () => void;
   onOpenHelp?: () => void;
   alertCount?: number;
+  evacuationMode?: EvacuationMode;
+  onEvacuationModeChange?: (mode: EvacuationMode) => void;
 }
 
 export default function ProductionBottomSheet({
@@ -46,6 +51,8 @@ export default function ProductionBottomSheet({
   onOpenAlerts,
   onOpenHelp,
   alertCount = 0,
+  evacuationMode = "car",
+  onEvacuationModeChange,
 }: ProductionBottomSheetProps) {
   const t = useI18n();
   // Mobile snap heights: 0 = peek (56px), 1 = half (360px), 2 = full (80vh)
@@ -53,10 +60,12 @@ export default function ProductionBottomSheet({
   // Desktop collapsed state
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [showTechnicalMath, setShowTechnicalMath] = useState(false);
+  const [audioGuidance, setAudioGuidance] = useState(false);
 
   const score = currentTile?.currentSeverityScore ?? 0;
   const closure = currentTile?.closure;
   const civicStatus = getCivicSafetyStatus(score, closure);
+  const tide = getCurrentTideStatus(new Date(), weather?.rainRateMmPerHour ?? weather?.recentRainMm ?? 0);
 
   const toggleMobileSnap = () => {
     setMobileSnap((prev) => (prev === 0 ? 1 : prev === 1 ? 2 : 0));
@@ -196,9 +205,38 @@ export default function ProductionBottomSheet({
           </div>
         )}
 
+        <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-foreground">Tide & Drainage Indicator</p>
+            <p className="text-[11px] text-muted-foreground">
+              🌊 {tide.warningLevel === "Normal" ? "Normal tide" : tide.warningLevel}: {tide.heightMeters.toFixed(2)}m • {tide.trend}
+            </p>
+          </div>
+          <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
+            {tide.heightMeters > 4.2 ? "Low drainage discharge" : "Drainage operating"}
+          </span>
+        </div>
+
         {/* 2. ACTIVE ROAD EVACUATION ROUTE */}
         {roadRoute && (
           <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2 shadow-xs">
+            <div className="grid grid-cols-4 gap-1 rounded-xl bg-background/70 p-1 border border-border">
+              {([
+                ["pedestrian", "🚶 Walk"],
+                ["twowheeler", "🛵 2-Wheeler"],
+                ["car", "🚗 Car"],
+                ["heavyRescue", "🚒 Rescue"],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onEvacuationModeChange?.(mode)}
+                  className={`min-h-11 rounded-lg text-[10px] font-semibold ${evacuationMode === mode ? "bg-emerald-600 text-white" : "text-muted-foreground hover:bg-muted"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Navigation className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -214,6 +252,20 @@ export default function ProductionBottomSheet({
                 Clear
               </button>
             </div>
+            <Button
+              type="button"
+              variant={audioGuidance ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => {
+                const next = !audioGuidance;
+                setAudioGuidance(next);
+                if (next && roadRoute.steps[0]) speakTurnInstruction(roadRoute.steps[0]);
+                else cancelVoiceAnnouncements();
+              }}
+            >
+              <Volume2 className="w-3.5 h-3.5" /> Audio Guidance
+            </Button>
 
             <p className="text-[11px] text-emerald-800 dark:text-emerald-300">
               {roadRoute.safetyMessage}
@@ -272,6 +324,11 @@ export default function ProductionBottomSheet({
               <p className="text-[11px] text-muted-foreground truncate">
                 {nearestShelter.address} • {nearestShelter.capacityStatus}
               </p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {nearestShelter.drinkingWater && <Badge variant="secondary" className="text-[9px]">💧 Water</Badge>}
+                {nearestShelter.medicalAid && <Badge variant="secondary" className="text-[9px]">🏥 First Aid</Badge>}
+                {nearestShelter.wheelchairAccessible && <Badge variant="secondary" className="text-[9px]">♿ Accessible</Badge>}
+              </div>
             </div>
             <Button
               size="sm"

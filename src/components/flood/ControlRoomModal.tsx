@@ -51,6 +51,35 @@ export default function ControlRoomModal({
 
   const pendingReports = reports.filter((r) => r.status === "Unverified");
 
+  const downloadIncidentFeed = () => {
+    const features = [
+      ...reports.map((report) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [report.lng, report.lat] },
+        properties: { kind: "flood-report", severity: report.severityUser, status: report.status, createdAt: report.createdAt },
+      })),
+      ...incidents.map((incident) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [incident.lng ?? mapCenter[1], incident.lat ?? mapCenter[0]] },
+        properties: { kind: "road-incident", status: incident.status, description: incident.description },
+      })),
+    ];
+    const geojson = { type: "FeatureCollection", features };
+    const cap = `<?xml version="1.0" encoding="UTF-8"?><alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><identifier>streetflood-${Date.now()}</identifier><sender>streetflood.live</sender><sent>${new Date().toISOString()}</sent><status>Actual</status><msgType>Update</msgType><scope>Public</scope><info><category>Met</category><event>Urban flood incident feed</event><urgency>Immediate</urgency><severity>Severe</severity><certainty>Observed</certainty><headline>Mumbai municipal flood incident feed</headline><description>Active citizen reports and road incidents exported for civic coordination.</description></info></alert>`;
+    for (const [name, content, type] of [
+      ["streetflood-incident-feed.geojson", JSON.stringify(geojson, null, 2), "application/geo+json"],
+      ["streetflood-incident-alert.cap.xml", cap, "application/xml"],
+    ] as const) {
+      const url = URL.createObjectURL(new Blob([content], { type }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+    toast.success("GeoJSON and CAP incident feeds downloaded.");
+  };
+
   const handleCreateClosure = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roadName.trim()) {
@@ -142,6 +171,9 @@ export default function ControlRoomModal({
           <DialogDescription className="text-xs">
             Manage official closures, verify citizen reports, and broadcast targeted flood alerts.
           </DialogDescription>
+          <Button type="button" variant="outline" size="sm" onClick={downloadIncidentFeed} className="w-full text-xs">
+            Export Incident Feed (GeoJSON + CAP)
+          </Button>
         </DialogHeader>
 
         <Tabs defaultValue="moderation" className="w-full mt-2">

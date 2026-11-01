@@ -89,7 +89,15 @@ export interface Shelter {
   capacityStatus: "Space available" | "Filling up" | "Near capacity";
   provenance?: "Official Verified" | "Community Reported" | "Simulated Demo";
   accessibilityNote?: string;
+  ward?: string;
+  contactPhone?: string;
+  drinkingWater?: boolean;
+  medicalAid?: boolean;
+  wheelchairAccessible?: boolean;
+  petFriendly?: boolean;
 }
+
+export type EvacuationMode = "pedestrian" | "twowheeler" | "car" | "heavyRescue";
 
 export interface RoadRouteStep {
   instruction: string;
@@ -134,6 +142,7 @@ export interface MapLayerOptions {
   showShelters: boolean;
   showEvacuationRoute: boolean;
   showReports: boolean;
+  highContrast?: boolean;
 }
 
 export interface RoadSegment {

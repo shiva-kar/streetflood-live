@@ -1,4 +1,4 @@
-import type { RoadRouteResult, RoadRouteStep, Shelter } from "./types";
+import type { EvacuationMode, RoadRouteResult, RoadRouteStep, Shelter } from "./types";
 import { assertZeroCostUrl } from "../guards/zeroCostGuard";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
@@ -8,7 +8,7 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ];
-const OSRM_BASE = "https://router.project-osrm.org/route/v1/driving";
+const OSRM_BASE = "https://router.project-osrm.org/route/v1";
 
 // Statically verify all configured endpoints conform to $0 zero-cost rules
 assertZeroCostUrl(NOMINATIM_BASE);
@@ -135,6 +135,7 @@ export function getCurrentUserGps(): Promise<GeolocationResult> {
 // ---------------------------------------------------------------------------
 export interface RealWeatherResult {
   recentRainMm: number; // last hour
+  rainRateMmPerHour: number;
   forecastRain3hMm: number; // next 3 hours
   hourlyTimes: string[];
   hourlyRainMm: number[];
@@ -152,7 +153,7 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
   if (cached) return cached;
 
   try {
-    const url = `${OPEN_METEO_BASE}?latitude=${snapLat}&longitude=${snapLng}&hourly=precipitation,rain&current=precipitation,temperature_2m,weather_code&forecast_hours=6&past_hours=2&timezone=auto`;
+    const url = `${OPEN_METEO_BASE}?latitude=${snapLat}&longitude=${snapLng}&hourly=precipitation,rain&current=precipitation,rain,temperature_2m,weather_code&forecast_hours=6&past_hours=2&timezone=auto`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("Weather service unavailable");
     const json = await res.json();
@@ -174,6 +175,7 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
 
     const result: RealWeatherResult = {
       recentRainMm: Math.round(pastHourRain * 10) / 10,
+      rainRateMmPerHour: Number((json.current?.rain ?? json.current?.precipitation ?? pastHourRain ?? 0).toFixed(1)),
       forecastRain3hMm: Math.round(next3h * 10) / 10,
       hourlyTimes: times.slice(Math.max(0, currentIdx - 1), currentIdx + 5),
       hourlyRainMm: rainArr.slice(Math.max(0, currentIdx - 1), currentIdx + 5),
@@ -187,6 +189,7 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
     console.warn("Open-Meteo weather fetch error:", e);
     return {
       recentRainMm: 0,
+      rainRateMmPerHour: 0,
       forecastRain3hMm: 0,
       hourlyTimes: [],
       hourlyRainMm: [],
@@ -307,8 +310,10 @@ export async function calculateWorldwideSafeRoute(
   start: [number, number],
   destination: [number, number],
   blockedPoints?: Array<{ lat: number; lng: number; description: string }>,
+  mode: EvacuationMode = "car",
 ): Promise<RoadRouteResult | null> {
-  const url = `${OSRM_BASE}/${start[1]},${start[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson&steps=true`;
+  const profile = mode === "pedestrian" ? "foot" : "driving";
+  const url = `${OSRM_BASE}/${profile}/${start[1]},${start[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson&steps=true`;
 
   try {
     const res = await fetch(url);
@@ -341,7 +346,7 @@ export async function calculateWorldwideSafeRoute(
     let blockedClosure: RoadRouteResult["blockedByClosure"] = undefined;
     let safetyScore = 95;
     let safetyStatus: RoadRouteResult["safetyStatus"] = "Safe";
-    let safetyMessage = "Clear road route. No impassable water reported.";
+    let safetyMessage = `Clear ${mode} route. No impassable water reported.`;
     const warnings: string[] = [];
 
     if (blockedPoints && blockedPoints.length > 0) {

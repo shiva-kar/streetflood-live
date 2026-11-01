@@ -68,6 +68,7 @@ export default function FloodMap(props: FloodMapProps) {
   const map = useRef<LType.Map | null>(null);
   const rects = useRef(new Map<string, LType.Rectangle>());
   const layers = useRef<Record<string, LType.LayerGroup>>({});
+  const baseTiles = useRef<LType.TileLayer | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -111,7 +112,7 @@ export default function FloodMap(props: FloodMapProps) {
 
     L.control.zoom({ position: "bottomleft" }).addTo(m);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    baseTiles.current = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
@@ -184,6 +185,18 @@ export default function FloodMap(props: FloodMapProps) {
     };
   }, [L]);
 
+  useEffect(() => {
+    if (!L || !map.current || !baseTiles.current) return;
+    const m = map.current;
+    baseTiles.current.remove();
+    baseTiles.current = L.tileLayer(
+      props.layerOptions?.highContrast
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: props.layerOptions?.highContrast ? "&copy; CARTO &copy; OpenStreetMap" : "&copy; OpenStreetMap" },
+    ).addTo(m);
+  }, [L, props.layerOptions?.highContrast]);
+
   // Handle focus changes (Place search or GPS jump)
   useEffect(() => {
     if (!map.current || !props.focus) return;
@@ -245,7 +258,9 @@ export default function FloodMap(props: FloodMapProps) {
         rects.current.set(t.id, r);
       }
 
-      const color = RISK_HEX[t.currentRiskLevel] || "#10b981";
+      const color = props.layerOptions?.highContrast
+        ? ({ Low: "#00ff88", Moderate: "#ffff00", High: "#ff6600", Critical: "#ff0033" } as Record<RiskLevel, string>)[t.currentRiskLevel] || "#00ff88"
+        : RISK_HEX[t.currentRiskLevel] || "#10b981";
       const isDimmed =
         props.onlyHighCritical &&
         (t.currentRiskLevel === "Low" || t.currentRiskLevel === "Moderate");

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Layers, X } from "lucide-react";
+import { Layers, X, Sun } from "lucide-react";
 import type { MapLayerOptions } from "@/lib/flood/types";
 
 interface MapLayerControlsProps {
@@ -46,6 +46,18 @@ export default function MapLayerControls({ options, onChange, isAdmin }: MapLaye
           </div>
 
           {/* Technical Grid Toggle (Feature 5) */}
+          <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <Sun className="h-3.5 w-3.5" /> High-contrast emergency view
+            </div>
+            <input
+              type="checkbox"
+              checked={options.highContrast ?? false}
+              onChange={() => toggle("highContrast")}
+              className="h-4 w-4 rounded-sm border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+            />
+          </label>
+
           <label className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
             <div className="space-y-0.5">
               <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">

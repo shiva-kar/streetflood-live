@@ -7,6 +7,7 @@ import type {
   Shelter,
   ShelterCandidate,
   Tile,
+  EvacuationMode,
 } from "./types";
 import { distanceKm, tileAt } from "./engine";
 
@@ -153,6 +154,7 @@ export function evaluateRouteRisk(
   tiles: Tile[],
   reports: FloodReport[],
   incidents: RoadIncident[],
+  mode: EvacuationMode = "car",
 ): {
   safetyStatus: "Safe" | "Caution" | "HighRisk" | "Impassable";
   safetyScore: number;
@@ -224,11 +226,23 @@ export function evaluateRouteRisk(
   const modRatio = counts.Moderate / totalPoints;
 
   // Determine overall safety verdict
-  if (blockedByClosure) {
+  const limits: Record<EvacuationMode, { maxRisk: RiskLevel; maxDepth: number }> = {
+    pedestrian: { maxRisk: "Moderate", maxDepth: 0.2 },
+    twowheeler: { maxRisk: "Moderate", maxDepth: 0.12 },
+    car: { maxRisk: "Moderate", maxDepth: 0.25 },
+    heavyRescue: { maxRisk: "High", maxDepth: 0.55 },
+  };
+  const allowedRisk = limits[mode].maxRisk;
+  const riskRank: Record<RiskLevel, number> = { Low: 0, Moderate: 1, High: 2, Critical: 3 };
+  const exceedsMode = riskRank[counts.Critical > 0 ? "Critical" : counts.High > 0 ? "High" : counts.Moderate > 0 ? "Moderate" : "Low"] > riskRank[allowedRisk];
+
+  if (blockedByClosure || (exceedsMode && mode !== "heavyRescue")) {
     return {
       safetyStatus: "Impassable",
       safetyScore: 0,
-      safetyMessage: `NO SUFFICIENTLY SAFE ROUTE FOUND: Route passes through a road closed to all traffic (${blockedByClosure.description}).`,
+      safetyMessage: blockedByClosure
+        ? `NO SUFFICIENTLY SAFE ROUTE FOUND: Route passes through a road closed to all traffic (${blockedByClosure.description}).`
+        : `NO SUFFICIENTLY SAFE ROUTE FOUND: ${mode} clearance threshold is exceeded.`,
       blockedByClosure,
       counts,
       dangerWarnings: uniqueWarnings,
@@ -537,9 +551,11 @@ export async function findBestShelterEvacuation(
   candidates: ShelterCandidate[];
 }> {
   // Focus on top closest candidate shelters (up to 8) to optimize evacuation route planning
-  const candidatePool = [...shelters]
+  const nearby = [...shelters]
     .sort((a, b) => distanceKm(origin.lat, origin.lng, a.lat, a.lng) - distanceKm(origin.lat, origin.lng, b.lat, b.lng))
     .slice(0, 8);
+  const legacy = shelters.filter((shelter) => /^sh[1-5]$/.test(shelter.id));
+  const candidatePool = [...new Map([...legacy, ...nearby].map((shelter) => [shelter.id, shelter])).values()].slice(0, 8);
 
   const candidates: ShelterCandidate[] = await Promise.all(
     candidatePool.map(async (shelter) => {
