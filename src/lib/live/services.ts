@@ -91,7 +91,7 @@ export function searchPlaces(q: string): Promise<Place[]> {
     return d.map((p) => {
       const parts = p.display_name.split(", ");
       return {
-        name: p.name || parts[0],
+        name: p.name || parts[0] || query,
         detail: parts.slice(1, 4).join(", "),
         lat: +p.lat,
         lng: +p.lon,
@@ -112,13 +112,13 @@ export function reverseGeocode(lat: number, lng: number): Promise<AreaInfo> {
     }>(`reverse?format=jsonv2&zoom=16&lat=${lat}&lon=${lng}`);
     const a = d.address ?? {};
     const label =
-      [a.road, a.suburb || a.neighbourhood || a.village, a.city || a.town || a.county]
+      [a["road"], a["suburb"] || a["neighbourhood"] || a["village"], a["city"] || a["town"] || a["county"]]
         .filter(Boolean)
         .slice(0, 2)
         .join(", ") ||
       d.display_name?.split(", ").slice(0, 2).join(", ") ||
       "This area";
-    return { label, countryCode: (a.country_code || "").toUpperCase() };
+    return { label, countryCode: (a["country_code"] || "").toUpperCase() };
   });
 }
 
@@ -155,11 +155,12 @@ export function getHelpPoints(lat: number, lng: number, radiusM = 2500): Promise
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
     const kindOf = (t: Record<string, string>): HelpKind => {
-      if (t.emergency === "assembly_point" || t.amenity === "shelter") return "shelter";
-      if (t.amenity === "hospital") return "hospital";
-      if (t.amenity === "police") return "police";
-      if (t.amenity === "fire_station") return "fire";
-      if (t.amenity === "community_centre") return "community";
+      const am = t["amenity"];
+      if (t["emergency"] === "assembly_point" || am === "shelter") return "shelter";
+      if (am === "hospital") return "hospital";
+      if (am === "police") return "police";
+      if (am === "fire_station") return "fire";
+      if (am === "community_centre") return "community";
       return "school";
     };
     return d.elements
@@ -170,13 +171,13 @@ export function getHelpPoints(lat: number, lng: number, radiusM = 2500): Promise
         const kind = kindOf(t);
         return {
           id: `${e.type}${e.id}`,
-          name: t.name || HELP_LABEL[kind],
+          name: t["name"] || HELP_LABEL[kind],
           kind,
           lat: p.lat,
           lng: p.lon,
         } satisfies HelpPoint;
       })
-      .filter((x): x is HelpPoint => !!x && !(x.kind === "shelter" && x.name === "Shelter" && !x.id));
+      .filter((x): x is HelpPoint => !!x);
   });
 }
 
@@ -214,7 +215,7 @@ export async function getRoutes(
     coords: r.geometry.coordinates.map(([x, y]) => [y, x] as [number, number]),
     distanceKm: r.distance / 1000,
     minutes: Math.max(1, Math.round(r.duration / 60)),
-    steps: r.legs[0].steps
+    steps: (r.legs[0]?.steps ?? [])
       .filter((s) => s.distance > 15 || s.maneuver.type === "arrive")
       .map((s) => {
         const turn =
