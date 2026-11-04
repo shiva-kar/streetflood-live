@@ -1,3 +1,4 @@
+import { BENGALURU_EXPANDED_SHELTERS } from "./bengaluruShelters";
 import type { Shelter } from "./types";
 
 /**
@@ -979,6 +980,70 @@ export const NATIONAL_EXPANDED_SHELTERS: Shelter[] = [
     "provenance": "Official Verified",
     "accessibilityNote": "Capacity for 3000 citizens with direct ambulance bay and emergency supplies.",
     "contactPhone": "080-22214430",
+    "drinkingWater": true,
+    "medicalAid": true,
+    "wheelchairAccessible": true,
+    "petFriendly": false
+  },
+  {
+    "id": "sh_blr_05",
+    "name": "Central Silk Board / Madiwala Disaster Staging Post",
+    "address": "Near Madiwala Police Station, Hosur Road, Bengaluru, Karnataka 560068",
+    "lat": 12.918,
+    "lng": 77.6235,
+    "kind": "Municipal Building",
+    "capacityStatus": "Space available",
+    "provenance": "Official Verified",
+    "accessibilityNote": "Silk Board junction emergency flood staging hub with heavy rescue water pumps.",
+    "contactPhone": "080-22975500",
+    "drinkingWater": true,
+    "medicalAid": true,
+    "wheelchairAccessible": true,
+    "petFriendly": false
+  },
+  {
+    "id": "sh_blr_06",
+    "name": "HSR Layout Sector 2 BBMP Disaster Relief Center",
+    "address": "27th Main Road, HSR Layout, Bengaluru, Karnataka 560102",
+    "lat": 12.9115,
+    "lng": 77.6435,
+    "kind": "Community Hall",
+    "capacityStatus": "Space available",
+    "provenance": "Official Verified",
+    "accessibilityNote": "Elevated community facility equipped with dry rations and emergency medical team.",
+    "contactPhone": "080-22975800",
+    "drinkingWater": true,
+    "medicalAid": true,
+    "wheelchairAccessible": true,
+    "petFriendly": true
+  },
+  {
+    "id": "sh_blr_07",
+    "name": "Bellandur EcoSpace Emergency Refuge Hall",
+    "address": "Marathahalli-Sarjapur Outer Ring Road, Bellandur, Bengaluru, Karnataka 560103",
+    "lat": 12.9275,
+    "lng": 77.684,
+    "kind": "Stadium",
+    "capacityStatus": "Space available",
+    "provenance": "Official Verified",
+    "accessibilityNote": "High ground refuge hub for Bellandur lake basin and tech corridor evacuees.",
+    "contactPhone": "080-28441200",
+    "drinkingWater": true,
+    "medicalAid": true,
+    "wheelchairAccessible": true,
+    "petFriendly": true
+  },
+  {
+    "id": "sh_blr_08",
+    "name": "Indiranagar Club & Civic Relief Hub",
+    "address": "100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560038",
+    "lat": 12.971,
+    "lng": 77.641,
+    "kind": "Community Hall",
+    "capacityStatus": "Space available",
+    "provenance": "Official Verified",
+    "accessibilityNote": "Equipped with backup power generation, first aid trauma center, and potable water.",
+    "contactPhone": "080-25281234",
     "drinkingWater": true,
     "medicalAid": true,
     "wheelchairAccessible": true,
@@ -2186,7 +2251,7 @@ export const NATIONAL_EXPANDED_SHELTERS: Shelter[] = [
   }
 ];
 
-export const COMPREHENSIVE_SHELTERS: Shelter[] = [...BASE_SHELTERS, ...NATIONAL_EXPANDED_SHELTERS, ...MUMBAI_WARD_SHELTERS].map(
+export const COMPREHENSIVE_SHELTERS: Shelter[] = [...BENGALURU_EXPANDED_SHELTERS, ...BASE_SHELTERS, ...NATIONAL_EXPANDED_SHELTERS, ...MUMBAI_WARD_SHELTERS].map(
   (s, index) => ({
     ...s,
     lat: Number(s.lat.toFixed(5)),
@@ -2225,3 +2290,5 @@ export function findNearestKnownShelters(
   withDistances.sort((a, b) => a.distanceKm - b.distanceKm);
   return withDistances.slice(0, limit);
 }
+
+export { BENGALURU_EXPANDED_SHELTERS } from "./bengaluruShelters";

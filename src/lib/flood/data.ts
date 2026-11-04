@@ -10,10 +10,7 @@ export const GRID = {
   dLng: 0.00095, // ≈ 100 m at 19°N
 };
 
-export const MAP_CENTER: [number, number] = [
-  GRID.south + (GRID.rows * GRID.dLat) / 2,
-  GRID.west + (GRID.cols * GRID.dLng) / 2,
-];
+export const MAP_CENTER: [number, number] = [12.9716, 77.5946]; // Bengaluru Central
 
 export const ZONES = [
   { key: "sion", label: "Sion", rows: [0, 11], cols: [0, 11] },
@@ -83,7 +80,99 @@ export interface StaticRoadCorridor {
   typicalBottleneck: string;
 }
 
+export const BENGALURU_ROAD_CORRIDORS: StaticRoadCorridor[] = [
+  // -------------------------------------------------------------------------
+  // BENGALURU CIVIC FLOOD BOTTLENECK CORRIDORS (BBMP Monitored Zones)
+  // -------------------------------------------------------------------------
+  {
+    id: "corridor_blr_ecospace",
+    name: "Outer Ring Road (EcoSpace / Bellandur Underpass)",
+    roadName: "Outer Ring Road (EcoSpace Service Road)",
+    coordinates: [
+      [12.9248, 77.6695],
+      [12.9265, 77.6835],
+      [12.9275, 77.6840],
+      [12.9305, 77.6890],
+      [12.9320, 77.6910],
+    ],
+    typicalBottleneck: "EcoSpace and Bellandur underpass stormwater canal overflow; traffic diversion to elevated flyover",
+  },
+  {
+    id: "corridor_blr_silkboard",
+    name: "Central Silk Board Junction & Underpass",
+    roadName: "Hosur Road / Silk Board Interchange",
+    coordinates: [
+      [12.9150, 77.6220],
+      [12.9172, 77.6228],
+      [12.9195, 77.6235],
+      [12.9220, 77.6180],
+    ],
+    typicalBottleneck: "Madiwala lake overflow gradient into Silk Board underpass; stalls two-wheelers and autos",
+  },
+  {
+    id: "corridor_blr_koramangala_80ft",
+    name: "Koramangala 80ft Road (4th Block / Sony World)",
+    roadName: "80 Feet Road Koramangala",
+    coordinates: [
+      [12.9420, 77.6200],
+      [12.9380, 77.6220],
+      [12.9348, 77.6240],
+      [12.9310, 77.6300],
+    ],
+    typicalBottleneck: "Primary stormwater drain (SWD) culvert overflow near Wipro Park and 4th Block market",
+  },
+  {
+    id: "corridor_blr_panathur",
+    name: "Panathur Railway Underpass (S-Bend Corridor)",
+    roadName: "Panathur Main Road",
+    coordinates: [
+      [12.9355, 77.6970],
+      [12.9370, 77.7030],
+      [12.9390, 77.7090],
+    ],
+    typicalBottleneck: "Low-lying railway culvert with steep depression; prone to rapid 3-4ft inundation",
+  },
+  {
+    id: "corridor_blr_sarjapur_iblur",
+    name: "Sarjapur Road (Iblur Junction to Agara Lake)",
+    roadName: "Sarjapur Main Road",
+    coordinates: [
+      [12.9310, 77.6190],
+      [12.9270, 77.6350],
+      [12.9248, 77.6530],
+      [12.9248, 77.6695],
+    ],
+    typicalBottleneck: "Agara lake surplus weir backwater pooling along inbound IT corridor lanes",
+  },
+  {
+    id: "corridor_blr_old_airport",
+    name: "Old Airport Road (Domlur Flyover to HAL)",
+    roadName: "Old Airport Road",
+    coordinates: [
+      [12.9620, 77.6380],
+      [12.9590, 77.6480],
+      [12.9570, 77.6600],
+      [12.9550, 77.6760],
+    ],
+    typicalBottleneck: "Low-lying natural storm drainage dip near Manipal Hospital and Command Hospital gate",
+  },
+  {
+    id: "corridor_blr_mekhri_circle",
+    name: "Mekhri Circle Underpass (Bellary Road)",
+    roadName: "Bellary Road / Airport Corridor",
+    coordinates: [
+      [12.9990, 77.5810],
+      [13.0080, 77.5830],
+      [13.0180, 77.5850],
+    ],
+    typicalBottleneck: "Mekhri Circle grade separator sump pit capacity during sudden downpours",
+  },
+];
+
 export const AFFECTED_ROAD_CORRIDORS: StaticRoadCorridor[] = [
+  // -------------------------------------------------------------------------
+  // MUMBAI CIVIC FLOOD BOTTLENECK CORRIDORS (BMC Monitored Zones)
+  // -------------------------------------------------------------------------
   {
     id: "corridor_lbs_subway",
     name: "Kurla Station / LBS Marg Subway",
@@ -157,9 +246,14 @@ export const EMERGENCY_CONTACTS = [
   { label: "Ambulance", number: "108", note: "Emergency medical" },
   { label: "Ambulance (maternal/child)", number: "102", note: "" },
   {
+    label: "BBMP Disaster Helpline (Bengaluru)",
+    number: "1533",
+    note: "BBMP 24x7 Control Room",
+  },
+  {
     label: "City disaster control room",
     number: "1916",
-    note: "BMC Disaster Management Helpline",
+    note: "BMC / Municipal Disaster Helpline",
   },
 ];
 
@@ -196,7 +290,7 @@ export const CHECKLISTS = [
 
 const ago = (now: number, min: number) => new Date(now - min * 60000).toISOString();
 
-export function seedState(now: number): AppState {
+export function seedState(now = Date.now()): AppState {
   const reports: FloodReport[] = [
     {
       id: "r1",
@@ -301,6 +395,59 @@ export function seedState(now: number): AppState {
       createdAt: ago(now, 45),
       status: "Unverified",
     },
+    // BENGALURU VERIFIED & LIVE HAZARD REPORTS
+    {
+      id: "blr_r1",
+      tileId: "t_blr_silkboard",
+      lat: 12.9175,
+      lng: 77.6231,
+      description: "Water accumulating near Silk Board junction bus shelter, autos avoiding curb lane.",
+      severityUser: "Knees",
+      createdAt: ago(now, 18),
+      status: "Verified",
+      reviewedAt: ago(now, 10),
+    },
+    {
+      id: "blr_r2",
+      tileId: "t_blr_madiwala",
+      lat: 12.9180,
+      lng: 77.6238,
+      description: "Two-wheelers stalling near Madiwala lake overflow channel.",
+      severityUser: "Knees",
+      createdAt: ago(now, 25),
+      status: "Unverified",
+    },
+    {
+      id: "blr_r3",
+      tileId: "t_blr_koramangala",
+      lat: 12.9348,
+      lng: 77.6240,
+      description: "Footpath submerged near Koramangala 4th Block 80ft road shops.",
+      severityUser: "Ankles",
+      createdAt: ago(now, 40),
+      status: "Unverified",
+    },
+    {
+      id: "blr_r4",
+      tileId: "t_blr_bellandur",
+      lat: 12.9265,
+      lng: 77.6835,
+      description: "Outer Ring Road EcoSpace service road waterlogged, water rising past median.",
+      severityUser: "WaistPlus",
+      createdAt: ago(now, 12),
+      status: "Verified",
+      reviewedAt: ago(now, 6),
+    },
+    {
+      id: "blr_r5",
+      tileId: "t_blr_indiranagar",
+      lat: 12.9710,
+      lng: 77.6410,
+      description: "Knee-deep water near 100ft Road Indiranagar 12th Main junction.",
+      severityUser: "Knees",
+      createdAt: ago(now, 30),
+      status: "Unverified",
+    },
   ];
   const incidents: RoadIncident[] = [
     {
@@ -325,10 +472,33 @@ export function seedState(now: number): AppState {
       updatedAt: ago(now, 9),
       createdBy: "Authority",
     },
+    // BENGALURU LIVE INCIDENTS
+    {
+      id: "blr_i1",
+      tileId: "t_blr_ecospace",
+      status: "ClosedAllTraffic",
+      description: "Outer Ring Road (EcoSpace underpass) submerged due to stormwater surge. Traffic diverted via Bellandur flyover.",
+      lat: 12.9265,
+      lng: 77.6835,
+      createdAt: ago(now, 8),
+      updatedAt: ago(now, 8),
+      createdBy: "Authority",
+    },
+    {
+      id: "blr_i2",
+      tileId: "t_blr_silkboard_inc",
+      status: "ClosedSmallVehicles",
+      description: "Closed to two-wheelers and autos near Central Silk Board junction underpass. Follow traffic police signals.",
+      lat: 12.9172,
+      lng: 77.6228,
+      createdAt: ago(now, 9),
+      updatedAt: ago(now, 9),
+      createdBy: "Authority",
+    },
   ];
   const alerts: FloodAlert[] = [];
   return {
-    version: 1,
+    version: 2,
     reports,
     incidents,
     alerts,

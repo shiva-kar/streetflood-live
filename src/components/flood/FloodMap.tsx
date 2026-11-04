@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type * as LType from "leaflet";
 import { MAP_CENTER, type StaticRoadCorridor } from "@/lib/flood/data";
-import { SION_KURLA_OSM_ROADS, evaluateOsmRoadRisk } from "@/lib/flood/osmNetwork";
+import { ALL_PRELOADED_OSM_ROADS, evaluateOsmRoadRisk } from "@/lib/flood/osmNetwork";
 import { CELL_DLAT, getDLngForLat, tileIdFromLatLng } from "@/lib/flood/dynamicGrid";
 import type {
   FloodReport,
@@ -65,12 +65,15 @@ const RISK_HEX: Record<RiskLevel, string> = {
 export default function FloodMap(props: FloodMapProps) {
   const el = useRef<HTMLDivElement>(null);
   const [L, setL] = useState<typeof LType | null>(null);
-  const [currentZoom, setCurrentZoom] = useState(15);
-  const [viewKey, setViewKey] = useState(0);
+  const [currentZoom, setCurrentZoom] = useState(props.focus?.zoom ?? 13);
   const map = useRef<LType.Map | null>(null);
   const rects = useRef(new Map<string, LType.Rectangle>());
   const layers = useRef<Record<string, LType.LayerGroup>>({});
   const baseTiles = useRef<LType.TileLayer | null>(null);
+  const lastFocusKey = useRef<number | null>(props.focus?.key ?? null);
+  const lastHighlightedShelter = useRef<string | null>(null);
+  const lastFittedRoute = useRef<string>("");
+  const isUserInteracting = useRef(false);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -89,7 +92,7 @@ export default function FloodMap(props: FloodMapProps) {
     const safeCenter: [number, number] =
       center && !isNaN(center[0]) && !isNaN(center[1]) ? center : MAP_CENTER;
 
-    const initialZoom = props.focus?.zoom ?? (safeCenter[0] > 20 && safeCenter[0] < 23 && safeCenter[1] > 77 && safeCenter[1] < 80 ? 5 : 15);
+    const initialZoom = props.focus?.zoom ?? 14;
 
     const m = L.map(el.current, {
       center: safeCenter,
@@ -142,7 +145,16 @@ export default function FloodMap(props: FloodMapProps) {
       propsRef.current.onTileClick(tid, e.latlng.lat, e.latlng.lng);
     });
 
-    m.on("zoomend", () => {
+    m.on("dragstart zoomstart movestart", (e: any) => {
+      // If user starts manual drag/zoom, halt any programmatic animation immediately
+      if (e?.originalEvent) {
+        isUserInteracting.current = true;
+        m.stop();
+      }
+    });
+
+    m.on("dragend zoomend moveend", () => {
+      isUserInteracting.current = false;
       setCurrentZoom(m.getZoom());
     });
 
@@ -168,7 +180,6 @@ export default function FloodMap(props: FloodMapProps) {
         zoom: m.getZoom(),
       });
       setCurrentZoom(m.getZoom());
-      setViewKey((k) => k + 1);
     };
 
     m.on("moveend", emitViewport);
@@ -178,17 +189,33 @@ export default function FloodMap(props: FloodMapProps) {
     }
 
     setTimeout(() => {
-      m.invalidateSize();
+      m.invalidateSize({ animate: false, pan: false });
       emitViewport();
     }, 100);
 
-    const ro = new ResizeObserver(() => {
-      m.invalidateSize();
+    let lastWidth = el.current.clientWidth;
+    let lastHeight = el.current.clientHeight;
+    let resizeTimer: number | null = null;
+
+    const ro = new ResizeObserver((entries) => {
+      if (!el.current || !map.current) return;
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      if (Math.abs(width - lastWidth) > 3 || Math.abs(height - lastHeight) > 3) {
+        lastWidth = width;
+        lastHeight = height;
+        if (resizeTimer) window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(() => {
+          map.current?.invalidateSize({ animate: false, pan: false });
+        }, 150);
+      }
     });
     ro.observe(el.current);
 
     const currentRects = rects.current;
     return () => {
+      if (resizeTimer) window.clearTimeout(resizeTimer);
       ro.disconnect();
       m.remove();
       map.current = null;
@@ -211,12 +238,14 @@ export default function FloodMap(props: FloodMapProps) {
     ).addTo(m);
   }, [L, props.layerOptions?.highContrast]);
 
-  // Handle focus changes (Place search or GPS jump)
+  // Handle focus changes (Place search or GPS jump) - strictly deduplicated
   useEffect(() => {
     if (!map.current || !props.focus) return;
     if (isNaN(props.focus.lat) || isNaN(props.focus.lng)) return;
+    if (props.focus.key === lastFocusKey.current) return;
+    lastFocusKey.current = props.focus.key;
     map.current.flyTo([props.focus.lat, props.focus.lng], props.focus.zoom ?? 15, {
-      duration: 1.0,
+      duration: 0.8,
     });
   }, [props.focus]);
 
@@ -344,7 +373,12 @@ export default function FloodMap(props: FloodMapProps) {
 
     const tileMap = new Map(props.tiles.map((t) => [t.id, t]));
 
-    for (const road of SION_KURLA_OSM_ROADS) {
+    const bounds = map.current?.getBounds();
+    for (const road of ALL_PRELOADED_OSM_ROADS) {
+      if (bounds && road.coordinates.length > 0) {
+        const [cLat, cLng] = road.coordinates[0];
+        if (!bounds.contains([cLat, cLng])) continue;
+      }
       const evalResult = evaluateOsmRoadRisk(road, tileMap, props.incidents, props.reports);
       const { riskLevel, severityScore, reason } = evalResult;
 
@@ -531,7 +565,21 @@ export default function FloodMap(props: FloodMapProps) {
     }
   }, [L, props.reports, props.tiles, props.showReports, props.layerOptions?.showReports]);
 
-  // Shelters markers
+  // Dedicated effect to smoothly pan to selected shelter ONCE without oscillation
+  useEffect(() => {
+    if (!map.current || !props.highlightShelterId) {
+      lastHighlightedShelter.current = null;
+      return;
+    }
+    if (props.highlightShelterId === lastHighlightedShelter.current) return;
+    lastHighlightedShelter.current = props.highlightShelterId;
+    const s = props.shelters.find((x) => x.id === props.highlightShelterId);
+    if (s && !isNaN(s.lat) && !isNaN(s.lng)) {
+      map.current.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
+    }
+  }, [props.highlightShelterId, props.shelters]);
+
+  // Shelters markers overlay
   useEffect(() => {
     if (!L) return;
     const g = layers.current.shelters;
@@ -541,26 +589,36 @@ export default function FloodMap(props: FloodMapProps) {
     if (props.layerOptions?.showShelters === false) return;
 
     // Performance & Usability Guard:
-    // Only show shelters when zoomed in to district or city level (currentZoom >= 8).
-    // At national/country zoom (< 8), do not render individual pins so the map never lags.
+    // Only show individual shelter pins when zoomed into district or city level (currentZoom >= 11).
+    // At state / national zoom (< 11), do not render individual pins so the map never lags or swarms.
     const zoomLevel = map.current ? map.current.getZoom() : currentZoom;
-    if (zoomLevel < 8 && !props.highlightShelterId) {
+    if (zoomLevel < 11 && !props.highlightShelterId) {
       return;
     }
 
     const bounds = map.current?.getBounds();
+    const center = map.current?.getCenter() || { lat: 12.9716, lng: 77.5946 };
 
-    for (const s of props.shelters) {
-      if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) continue;
+    // Filter candidate shelters within current viewport bounds
+    const candidateShelters = props.shelters.filter((s) => {
+      if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) return false;
+      if (props.highlightShelterId === s.id) return true;
+      return bounds ? bounds.contains([s.lat, s.lng]) : true;
+    });
 
+    // Sort by distance to center and cap at 35 markers to guarantee 60 FPS performance
+    const displayShelters = candidateShelters
+      .map((s) => ({
+        shelter: s,
+        distSq: (s.lat - center.lat) ** 2 + (s.lng - center.lng) ** 2,
+      }))
+      .sort((a, b) => a.distSq - b.distSq)
+      .slice(0, 35)
+      .map((item) => item.shelter);
+
+    for (const s of displayShelters) {
       const isHighlighted = props.highlightShelterId === s.id;
-
-      // When zoomed in, strictly filter to markers visible in the current viewport bounds
-      if (!isHighlighted && bounds && !bounds.contains([s.lat, s.lng])) {
-        continue;
-      }
-
-      const size = isHighlighted ? 36 : currentZoom < 10 ? 22 : 26;
+      const size = isHighlighted ? 36 : currentZoom < 13 ? 24 : 28;
       const anchor = size / 2;
 
       const marker = L.marker([s.lat, s.lng], {
@@ -590,14 +648,7 @@ export default function FloodMap(props: FloodMapProps) {
         propsRef.current.onShelterClick?.(s.id);
       });
     }
-
-    if (props.highlightShelterId) {
-      const s = props.shelters.find((x) => x.id === props.highlightShelterId);
-      if (s && !isNaN(s.lat) && !isNaN(s.lng)) {
-        map.current?.flyTo([s.lat, s.lng], 16, { duration: 0.6 });
-      }
-    }
-  }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters, currentZoom, viewKey]);
+  }, [L, props.shelters, props.highlightShelterId, props.layerOptions?.showShelters, currentZoom]);
 
   // Safe road route polyline
   useEffect(() => {
@@ -635,19 +686,25 @@ export default function FloodMap(props: FloodMapProps) {
         interactive: false,
       }).addTo(g);
 
-      // Auto-fit map viewport to frame the complete safe evacuation route
-      try {
-        const routeBounds = L.latLngBounds(pts);
-        if (routeBounds.isValid()) {
-          map.current?.fitBounds(routeBounds.pad(0.22), {
-            animate: true,
-            duration: 0.8,
-            maxZoom: 16,
-          });
+      // Auto-fit map viewport ONCE per unique route path (deduplicated to prevent jitter)
+      const routeSig = pts.map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join(";");
+      if (routeSig !== lastFittedRoute.current) {
+        lastFittedRoute.current = routeSig;
+        try {
+          const routeBounds = L.latLngBounds(pts);
+          if (routeBounds.isValid()) {
+            map.current?.fitBounds(routeBounds.pad(0.22), {
+              animate: true,
+              duration: 0.8,
+              maxZoom: 16,
+            });
+          }
+        } catch {
+          // Fallback
         }
-      } catch {
-        // Fallback
       }
+    } else {
+      lastFittedRoute.current = "";
     }
   }, [L, props.roadRouteCoords, props.roadRouteSafety, props.layerOptions?.showEvacuationRoute]);
 

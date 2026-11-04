@@ -14,6 +14,8 @@ import type { UserProfile } from "@/lib/supabase/client";
 import { speakAlert } from "@/lib/flood/voiceAnnouncer";
 
 interface ProductionHeaderProps {
+  onOpenIbmBobShowcase?: () => void;
+  onOpenIbmBobCopilot?: () => void;
   onSelectPlace: (lat: number, lng: number, name: string) => void;
   onLocateUser: () => void;
   isLocating: boolean;
@@ -42,6 +44,8 @@ export default function ProductionHeader({
   alertCount = 0,
   criticalAlert,
   activeCityName,
+  onOpenIbmBobShowcase,
+  onOpenIbmBobCopilot,
 }: ProductionHeaderProps) {
   const t = useI18n();
   const [query, setQuery] = useState("");
@@ -196,6 +200,12 @@ export default function ProductionHeader({
               className={currentLang === "en" ? "font-bold text-primary" : ""}
             >
               English
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleLanguageChange("kn")}
+              className={currentLang === "kn" ? "font-bold text-primary" : ""}
+            >
+              ಕನ್ನಡ (Kannada)
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => handleLanguageChange("hi")}

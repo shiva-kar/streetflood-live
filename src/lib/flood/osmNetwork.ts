@@ -40280,3 +40280,11 @@ export function evaluateOsmRoadRisk(
     reason: `Normal conditions (${maxScore}/100) – Safe to pass`,
   };
 }
+
+export { BENGALURU_OSM_ROADS } from "./bengaluruOsmRoads";
+import { BENGALURU_OSM_ROADS } from "./bengaluruOsmRoads";
+export const ALL_PRELOADED_OSM_ROADS: OsmRoadSegment[] = [
+  ...BENGALURU_OSM_ROADS,
+  ...SION_KURLA_OSM_ROADS,
+];
+

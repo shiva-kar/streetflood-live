@@ -68,9 +68,9 @@ export default function EmergencyHelpModal({ open, onClose }: EmergencyHelpModal
                 NDMA Helpline: 1078
               </a>
               <span>•</span>
-              <a href="tel:1916" className="hover:underline flex items-center gap-1 font-medium text-foreground">
+              <a href="tel:1533" className="hover:underline flex items-center gap-1 font-medium text-foreground">
                 <PhoneCall className="w-3.5 h-3.5 text-primary" />
-                Disaster Control: 1916
+                BBMP Helpline: 1533
               </a>
             </div>
           </div>

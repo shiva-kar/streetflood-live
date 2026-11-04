@@ -123,8 +123,8 @@ export function getCurrentUserGps(): Promise<GeolocationResult> {
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000,
+        timeout: 5000,
+        maximumAge: 60000,
       },
     );
   });
@@ -248,7 +248,11 @@ out center 30;
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
-      const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`);
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 3500);
+      const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
+        signal: ctrl.signal,
+      }).finally(() => clearTimeout(timeoutId));
       if (!res.ok) continue;
       const json = await res.json();
       const elements = json.elements || [];

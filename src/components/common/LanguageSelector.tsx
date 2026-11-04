@@ -9,6 +9,7 @@ export function LanguageSelector({ value, onChange }: { value: GuidanceLanguage;
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="en-IN">English</SelectItem>
+        <SelectItem value="kn-IN">ಕನ್ನಡ (Kannada)</SelectItem>
         <SelectItem value="hi-IN">हिन्दी</SelectItem>
         <SelectItem value="mr-IN">मराठी</SelectItem>
       </SelectContent>

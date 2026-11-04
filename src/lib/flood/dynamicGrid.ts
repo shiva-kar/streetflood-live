@@ -84,6 +84,29 @@ export const RECENT_WINDOW_HOURS = 6;
  * Automatically limits tile count to maintain 60 FPS on mobile.
  */
 export function resolveLocalityAndWard(lat: number, lng: number): { locality: string; ward: string } {
+  // Bengaluru primary civic corridor bounds (~12.85 to 13.08 N, 77.50 to 77.75 E)
+  if (lat >= 12.85 && lat <= 13.08 && lng >= 77.50 && lng <= 77.75) {
+    if (lat >= 12.955 && lng >= 77.57 && lng <= 77.62) {
+      return { locality: "CBD / MG Road / Richmond Circle", ward: "Central Zone (BBMP)" };
+    }
+    if (lat >= 12.95 && lng >= 77.62 && lng <= 77.68) {
+      return { locality: "Indiranagar 100ft Road / Domlur", ward: "East Zone (BBMP)" };
+    }
+    if (lat >= 12.92 && lat <= 12.955 && lng >= 77.60 && lng <= 77.645) {
+      return { locality: "Koramangala 80ft Road / NGV Belt", ward: "South Zone (BBMP)" };
+    }
+    if (lat <= 12.925 && lng >= 77.61 && lng <= 77.65) {
+      return { locality: "Central Silk Board & HSR Layout", ward: "Bommanahalli Zone (BBMP)" };
+    }
+    if (lng >= 77.66) {
+      return { locality: "Outer Ring Road (Bellandur / EcoSpace tech corridor)", ward: "Mahadevapura Zone (BBMP)" };
+    }
+    if (lng <= 77.56) {
+      return { locality: "Rajajinagar / Vijayanagar Corridor", ward: "West Zone (BBMP)" };
+    }
+    return { locality: "Bengaluru Urban Corridor", ward: "BBMP Monitored Zone" };
+  }
+
   // Sion–Kurla corridor bounds in Mumbai
   if (lat >= 19.025 && lat <= 19.085 && lng >= 72.845 && lng <= 72.895) {
     let closestRoad = "";

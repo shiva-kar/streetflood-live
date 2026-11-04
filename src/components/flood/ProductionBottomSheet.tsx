@@ -26,6 +26,8 @@ import { getCurrentTideStatus } from "@/lib/flood/tideData";
 import { speakTurnInstruction, cancelVoiceAnnouncements } from "@/lib/flood/voiceAnnouncer";
 
 interface ProductionBottomSheetProps {
+  onOpenIbmBobShowcase?: () => void;
+  onOpenIbmBobCopilot?: () => void;
   currentTile: Tile | null;
   weather: RealWeatherResult | null;
   nearestShelter: (Shelter & { distanceKm?: number; distanceLabel?: string }) | null;
@@ -69,6 +71,8 @@ export default function ProductionBottomSheet({
   activeCityName,
   isNationalView = false,
   onSelectCity,
+  onOpenIbmBobShowcase,
+  onOpenIbmBobCopilot,
 }: ProductionBottomSheetProps) {
   const t = useI18n();
   // Mobile snap heights: 0 = peek (56px), 1 = half (360px), 2 = full (80vh)
@@ -217,6 +221,30 @@ export default function ProductionBottomSheet({
         </Button>
       </div>
 
+      {/* IBM BOB AGENT ACTION PILL */}
+      {onOpenIbmBobCopilot && (
+        <div className={`px-4 pt-2 ${desktopCollapsed ? "sm:hidden" : ""}`}>
+          <button
+            type="button"
+            onClick={onOpenIbmBobCopilot}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-blue-500/10 hover:border-blue-500/50 hover:bg-blue-500/20 text-xs font-semibold text-foreground transition-all cursor-pointer shadow-xs group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-600 text-[10px] font-black text-white shadow-xs">
+                IBM
+              </span>
+              <span className="font-bold text-foreground">Ask Bob Civic Agent</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold hidden sm:inline">
+                Build for Bengaluru
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 text-blue-600 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* BODY CONTENT */}
       {/* Visible on Mobile when snap > 0; Visible on Desktop unless desktopCollapsed */}
       <div
@@ -247,12 +275,12 @@ export default function ProductionBottomSheet({
         <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between">
           <div>
             <p className="font-semibold text-foreground">
-              {isNationalView ? "National Drainage & River Basin Flow" : "Drainage & Flow Indicator"}
+              {isNationalView ? "National Drainage & River Basin Flow" : "Stormwater Drainage & Rajakaluve Indicator"}
             </p>
             <p className="text-[11px] text-muted-foreground">
               {isNationalView
                 ? "Active municipal stormwater pumps and river catchment discharge monitored."
-                : `${tide.warningLevel === "Normal" ? "Normal discharge flow" : tide.warningLevel}: water level within drainage thresholds`}
+                : "BBMP primary stormwater drains (Rajakaluves) & lake interconnects operating normally"}
             </p>
           </div>
           <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
@@ -376,9 +404,9 @@ export default function ProductionBottomSheet({
               {onSelectCity && (
                 <div className="flex flex-wrap gap-1 pt-0.5">
                   {[
+                    { city: "Bengaluru", lat: 12.9716, lng: 77.5946 },
                     { city: "Delhi", lat: 28.6139, lng: 77.2090 },
                     { city: "Mumbai", lat: 19.0760, lng: 72.8777 },
-                    { city: "Bengaluru", lat: 12.9716, lng: 77.5946 },
                     { city: "Kolkata", lat: 22.5726, lng: 88.3639 },
                     { city: "Guwahati", lat: 26.1445, lng: 91.7362 },
                     { city: "Odisha", lat: 20.2961, lng: 85.8245 },

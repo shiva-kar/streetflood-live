@@ -78,7 +78,7 @@ export default function Header({
                 variant="outline"
                 className="hidden lg:inline-flex text-[11px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"
               >
-                Mumbai • Sion–Kurla
+                Bengaluru • Central
               </Badge>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight hidden lg:block truncate mt-0.5">
@@ -251,7 +251,7 @@ export default function Header({
                   <h2 className="font-display font-extrabold text-sm text-slate-900 dark:text-slate-100">
                     StreetFlood<span className="text-sky-600">.Live</span>
                   </h2>
-                  <p className="text-[10px] text-slate-500">Mumbai • Sion–Kurla</p>
+                  <p className="text-[10px] text-slate-500">Bengaluru • Central</p>
                 </div>
               </div>
               <button

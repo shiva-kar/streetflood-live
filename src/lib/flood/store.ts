@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 import { seedState } from "./data";
 import type { AppState } from "./types";
 
-const KEY = "streetflood:v1";
-const ALIAS_KEY = "streetflood_state_v1";
+const KEY = "streetflood:v2";
+const ALIAS_KEY = "streetflood_state_v2";
 let state: AppState | null = null;
 const listeners = new Set<() => void>();
 
@@ -12,7 +12,7 @@ function load(): AppState {
     const raw = window.localStorage.getItem(KEY) || window.localStorage.getItem(ALIAS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as AppState;
-      if (parsed.version === 1) return parsed;
+      if (parsed.version === 2) return parsed;
     }
   } catch {
     /* corrupted storage falls back to seed */

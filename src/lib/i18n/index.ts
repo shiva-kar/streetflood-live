@@ -1,4 +1,4 @@
-export type Language = "en" | "hi" | "mr";
+export type Language = "en" | "kn" | "hi" | "mr";
 
 export interface Translations {
   appName: string;
@@ -50,6 +50,54 @@ export interface Translations {
 }
 
 export const TRANSLATIONS: Record<Language, Translations> = {
+  kn: {
+    appName: "ಸ್ಟ್ರೀಟ್‌ಫ್ಲಡ್ ಲೈವ್",
+    tagline: "ಬೆಂಗಳೂರು ನೇರ ರಸ್ತೆ ಜಲಾವೃತ ಮಾಹಿತಿ ಮತ್ತು ಸುರಕ್ಷಿತ ಮಾರ್ಗಗಳು",
+    tabMap: "ನಕ್ಷೆ",
+    tabReport: "ವರದಿ ಮಾಡಿ",
+    tabAlerts: "ಎಚ್ಚರಿಕೆಗಳು",
+    tabHelp: "ಸಹಾಯ",
+    searchPlaceholder: "ರಸ್ತೆ, ಬಿಬಿಎಂಪಿ ಆಶ್ರಯ ತಾಣ ಅಥವಾ ಪ್ರದೇಶ ಹುಡುಕಿ...",
+    useMyLocation: "ನನ್ನ ಸ್ಥಳ ಬಳಸಿ",
+    locating: "ಸ್ಥಳವನ್ನು ಹುಡುಕಲಾಗುತ್ತಿದೆ...",
+    nearMeHeadline: "ನಿಮ್ಮ ಸಮೀಪದ ಪರಿಸ್ಥಿತಿ",
+    statusSafe: "ಸುರಕ್ಷಿತ: ರಸ್ತೆಗಳು ಸಂಚಾರಯೋಗ್ಯ",
+    statusSafeDesc: "ರಸ್ತೆಗಳಲ್ಲಿ ನೀರಿಲ್ಲ, ಸಂಚಾರಕ್ಕೆ ಯಾವುದೇ ಅಡ್ಡಿಯಿಲ್ಲ.",
+    statusCaution: "ಎಚ್ಚರಿಕೆ: ರಸ್ತೆಯಲ್ಲಿ ನೀರು",
+    statusCautionDesc: "ಹಿಮ್ಮಡಿಯವರೆಗೆ ನೀರು. ಎಚ್ಚರಿಕೆಯಿಂದ ಚಲಿಸಿ, ನಿಧಾನವಾಗಿ ಚಲಿಸಿ.",
+    statusAvoid: "ತಪ್ಪಿಸಿ: ಆಳವಾದ ನೀರು",
+    statusAvoidDesc: "ಮೊಣಕಾಲಿನವರೆಗೆ ನೀರು. ದ್ವಿಚಕ್ರ ವಾಹನಗಳು ನಿಲ್ಲುವ ಅಪಾಯವಿದೆ.",
+    statusDanger: "ಅಪಾಯ: ರಸ್ತೆ ಮುಚ್ಚಲಾಗಿದೆ / ತೀವ್ರ ಪ್ರವಾಹ",
+    statusDangerDesc: "ಸೊಂಟದವರೆಗೆ ನೀರು ಅಥವಾ ರಸ್ತೆ ಸಂಪೂರ್ಣ ಬಂದ್. ಮುಂದೆ ಸಾಗಬೇಡಿ.",
+    reportFlooding: "ಜಲಾವೃತ ವರದಿ ಸಲ್ಲಿಸಿ",
+    waterDepth: "ನೀರಿನ ಆಳ",
+    footpathLevel: "ಪಾದಚಾರಿ ಮಾರ್ಗ ಮಟ್ಟ",
+    footpathDesc: "ರಾಜಕಾಲುವೆ ಉಕ್ಕಿ ಹರಿಯುವುದು, ಸಣ್ಣ ಗುಂಡಿಗಳು",
+    ankleDeep: "ಹಿಮ್ಮಡಿ ಮಟ್ಟ",
+    ankleDesc: "5–10 ಸೆಂ.ಮೀ ನೀರು, ನಡೆದಾಡಬಹುದು",
+    kneeDeep: "ಮೊಣಕಾಲು ಮಟ್ಟ",
+    kneeDesc: "20–40 ಸೆಂ.ಮೀ, ದ್ವಿಚಕ್ರ ವಾಹನ ಸ್ಥಗಿತ ಅಪಾಯ",
+    waistDeep: "ಸೊಂಟ ಅಥವಾ ಹೆಚ್ಚಿನ ಮಟ್ಟ",
+    waistDesc: "ಅತ್ಯಂತ ಅಪಾಯಕಾರಿ, ವಾಹನಗಳು ಮುಳುಗುತ್ತವೆ",
+    addPhoto: "ಫೋಟೋ ಸೇರಿಸಿ (ಐಚ್ಛಿಕ)",
+    optionalNote: "ವಿವರ ಅಥವಾ ಹೆಗ್ಗುರುತು (ಉದಾ: ಸಿಲ್ಕ್ ಬೋರ್ಡ್ ಬಳಿ)",
+    submitReport: "ನೇರ ವರದಿ ಸಲ್ಲಿಸಿ",
+    submitting: "ಸಲ್ಲಿಸಲಾಗುತ್ತಿದೆ...",
+    reportSuccess: "ಧನ್ಯವಾದಗಳು! ನಿಮ್ಮ ವರದಿ ಎಲ್ಲರಿಗೂ ತಕ್ಷಣ ಲೈವ್ ಆಗಿದೆ.",
+    safeRoute: "ಸುರಕ್ಷಿತ ಮಾರ್ಗ",
+    whereTo: "ನೀವು ಎಲ್ಲಿಗೆ ಹೋಗಬೇಕು?",
+    findRoute: "ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಹುಡುಕಿ",
+    nearestShelter: "ಸಮೀಪದ ಬಿಬಿಎಂಪಿ ಸುರಕ್ಷಿತ ಆಶ್ರಯ",
+    directions: "ಮಾರ್ಗದರ್ಶನ",
+    callEmergency: "112 ಕರೆ ಮಾಡಿ (ತುರ್ತು)",
+    emergencyHotline: "ಬಿಬಿಎಂಪಿ ಸಹಾಯವಾಣಿ: 1533 | ತುರ್ತು: 112",
+    floodChecklist: "ಪ್ರವಾಹ ಸನ್ನದ್ಧತಾ ಪರಿಶೀಲನಾ ಪಟ್ಟಿ",
+    controlRoom: "ನಿಯಂತ್ರಣ ಕೊಠಡಿ (Control Room)",
+    signIn: "ಸೈನ್ ಇನ್",
+    signOut: "ಸೈನ್ ಔಟ್",
+    offlineNotice: "ನೀವು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿದ್ದೀರಿ. ವರದಿಯನ್ನು ಉಳಿಸಲಾಗಿದೆ, ಆನ್‌ಲೈನ್ ಬಂದಾಗ ಕಳುಹಿಸಲಾಗುವುದು.",
+    whyExplanation: "ಈ ಸುರಕ್ಷತಾ ಸ್ಕೋರ್ ಏಕೆ?",
+  },
   en: {
     appName: "StreetFlood Live",
     tagline: "Live Hyperlocal Street Flood Conditions & Safe Routes",

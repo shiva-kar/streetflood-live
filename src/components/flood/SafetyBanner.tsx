@@ -15,7 +15,7 @@ export default function SafetyBanner() {
         <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
         <p className="truncate">
           <strong className="font-bold">Civic flood safety notice:</strong> Real-time map
-          combining crowdsourced reports, rainfall, and water-level indicators for Sion–Kurla, Mumbai.{" "}
+          combining crowdsourced reports, rainfall, and water-level indicators for Bengaluru, Karnataka.{" "}
           <span className="hidden md:inline">
             Not for official emergency navigation. In urgent life-threatening situations, dial{" "}
             <span className="font-extrabold underline">112</span>.

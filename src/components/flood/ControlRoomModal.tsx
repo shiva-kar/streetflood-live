@@ -25,7 +25,7 @@ import { createLiveAlert, createLiveIncident, type UserProfile } from "@/lib/sup
 import type { FloodAlert, FloodReport, IncidentStatus, RoadIncident } from "@/lib/flood/types";
 import { searchPlaces } from "@/lib/flood/openData";
 import { reverseGeocode } from "@/lib/reporting/reverseGeocoder";
-import { SION_KURLA_OSM_ROADS } from "@/lib/flood/osmNetwork";
+import { ALL_PRELOADED_OSM_ROADS } from "@/lib/flood/osmNetwork";
 import { toast } from "sonner";
 
 interface ControlRoomModalProps {
@@ -95,10 +95,12 @@ export default function ControlRoomModal({
     if (open) {
       setClosureCoords(mapCenter);
     }
-  }, [open, mapCenter]);
-
-  // Contextual Quick Corridors based on coordinates
+  }, [open, mapCenter]);  // Contextual Quick Corridors based on coordinates
   const quickCorridors = useMemo(() => {
+    // Near Bengaluru (~12.97) - Primary Focus:
+    if (Math.abs(mapCenter[0] - 12.97) < 0.45 || (mapCenter[0] > 12.8 && mapCenter[0] < 13.2 && mapCenter[1] > 77.4 && mapCenter[1] < 77.8)) {
+      return ["Outer Ring Road (EcoSpace)", "Koramangala 80ft Road", "Central Silk Board", "Sarjapur Road", "Old Airport Road", "Hosur Road", "Bellary Road"];
+    }
     // Near Mumbai (~19.05):
     if (Math.abs(mapCenter[0] - 19.05) < 0.25) {
       return ["LBS Marg", "CST Road", "Sion Circle", "SCLR Flyover", "Eastern Express Highway", "Kurla West Subway"];
@@ -132,11 +134,11 @@ export default function ControlRoomModal({
       return;
     }
 
-    // 1. Instant local search from OSM network segments
+    // 1. Instant local search from OSM network segments (Bengaluru & National)
     const query = val.toLowerCase().trim();
-    const localMatches = SION_KURLA_OSM_ROADS
+    const localMatches = ALL_PRELOADED_OSM_ROADS
       .filter((r) => r.name && r.name.toLowerCase().includes(query))
-      .slice(0, 5)
+      .slice(0, 8)
       .map((r) => {
         const mid = r.coordinates[Math.floor(r.coordinates.length / 2)] || mapCenter;
         return {
@@ -200,8 +202,14 @@ export default function ControlRoomModal({
 
   const handleQuickCorridorClick = (corridor: string) => {
     handleRoadNameChange(corridor);
-    // Find matching coordinates if available
-    const match = SION_KURLA_OSM_ROADS.find((r) => r.name?.toLowerCase() === corridor.toLowerCase());
+    // Find matching coordinates from preloaded road networks
+    const q = corridor.toLowerCase();
+    const match = ALL_PRELOADED_OSM_ROADS.find(
+      (r) =>
+        r.name?.toLowerCase() === q ||
+        r.name?.toLowerCase().includes(q) ||
+        q.includes(r.name?.toLowerCase() || ""),
+    );
     if (match) {
       const mid = match.coordinates[Math.floor(match.coordinates.length / 2)];
       setClosureCoords(mid);

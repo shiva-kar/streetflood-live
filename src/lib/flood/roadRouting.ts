@@ -185,8 +185,9 @@ export function evaluateRouteRisk(
     // 1. Check proximity to official road closures (within 65m)
     for (const inc of incidents) {
       const incTile = tileMap.get(inc.tileId);
-      const incLat = incTile?.centerLat ?? lat;
-      const incLng = incTile?.centerLng ?? lng;
+      const incLat = incTile?.centerLat ?? inc.lat;
+      const incLng = incTile?.centerLng ?? inc.lng;
+      if (incLat == null || incLng == null || isNaN(incLat) || isNaN(incLng)) continue;
       const dist = distanceKm(lat, lng, incLat, incLng) * 1000; // meters
 
       if (dist <= 65) {

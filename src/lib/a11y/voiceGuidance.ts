@@ -1,6 +1,6 @@
 import type { RoadRouteStep } from "@/lib/flood/types";
 
-export type GuidanceLanguage = "en-IN" | "hi-IN" | "mr-IN";
+export type GuidanceLanguage = "en-IN" | "kn-IN" | "hi-IN" | "mr-IN";
 
 export function speakGuidance(text: string, language: GuidanceLanguage, volume = 1) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
