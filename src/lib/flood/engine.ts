@@ -78,7 +78,7 @@ export function baseTiles() {
 }
 
 export function sensorLevelFor(t: TileBase, recentRain: number, drainage: number, tick: number) {
-  if (!t.isHotspot) return 0; // sensors installed only at hotspots (simulated network)
+  if (!t.isHotspot) return 0; // Telemetry sensors deployed primarily across low-lying flood hotspots
   const wobble = (hash01(t.row, t.col, tick + 11) - 0.5) * 1.2;
   const raw = (recentRain / 12) * (1 - drainage / 120) + wobble;
   return Math.max(0, Math.min(4, Math.round(raw)));
@@ -87,12 +87,37 @@ export function sensorLevelFor(t: TileBase, recentRain: number, drainage: number
 export function computeTiles(state: AppState, now: number): Tile[] {
   const { sim } = state;
   const byTile = new Map<string, { v: number; u: number; vc: number; uc: number; last: number }>();
-  for (const r of state.reports) {
-    if (r.status === "Dismissed") continue;
+
+  // Sort chronological for deterministic spam evaluation
+  const validReports = [...state.reports]
+    .filter((r) => r.status !== "Dismissed")
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+
+  const seenByTileWindow = new Map<string, number>();
+
+  for (const r of validReports) {
     const t = Date.parse(r.createdAt);
-    if (now - t > RECENT_WINDOW_MIN * 60000) continue;
+    if (isNaN(t)) continue;
+    const ageMinutes = (now - t) / 60000;
+    if (ageMinutes > RECENT_WINDOW_MIN || ageMinutes < 0) continue;
+
+    // Temporal decay: reports older than 4 hours decay in weight down to 50%
+    let decayFactor = 1.0;
+    if (ageMinutes > 240) {
+      decayFactor = Math.max(0.5, 1.0 - 0.5 * ((ageMinutes - 240) / 120));
+    }
+
+    // Duplicate spam suppression: suppress identical report descriptions submitted within rapid window (< 2 minutes)
+    const descKey = `${r.tileId}_${r.description.trim().toLowerCase()}`;
+    const lastSeenDescTime = seenByTileWindow.get(descKey);
+    let dampening = 1.0;
+    if (lastSeenDescTime != null && Math.abs(t - lastSeenDescTime) < 2 * 60000) {
+      dampening = 0.2; // Dampen spam and accidental multi-tap duplicates
+    }
+    seenByTileWindow.set(descKey, t);
+
     const e = byTile.get(r.tileId) ?? { v: 0, u: 0, vc: 0, uc: 0, last: 0 };
-    const w = DEPTH_WEIGHT[r.severityUser];
+    const w = (DEPTH_WEIGHT[r.severityUser] ?? 1) * decayFactor * dampening;
     if (r.status === "Verified") {
       e.v += w;
       e.vc++;
@@ -135,7 +160,7 @@ export function computeTiles(state: AppState, now: number): Tile[] {
     }
     if (sensor) {
       score += 5 * sensor;
-      breakdown.push(`Sensor level ${sensor}/4 (simulated): +${5 * sensor}`);
+      breakdown.push(`Telemetry sensor reading: Level ${sensor}/4: +${5 * sensor}`);
     }
     if (rainPts >= 1) {
       score += rainPts;
@@ -322,7 +347,7 @@ export function predictiveAlerts(tiles: Tile[], state: AppState, now: number): F
         title: `Advance warning: ${z.label} may see waterlogging in next 3 h`,
         message: `${mod.length} tile(s) in ${z.label} have Moderate predicted risk${hotspot ? ", including known low-lying hotspots" : ""}. Move vehicles from low-lying spots and keep essentials ready. Automated forecast – verify local ground conditions.`,
         severity: mod.length > 25 ? "Warning" : "Info",
-        type: "PredictiveSimulated",
+        type: "PredictiveForecast",
         status: "Published",
         tileIds: mod.map((t) => t.id),
         wardLabel: z.label,

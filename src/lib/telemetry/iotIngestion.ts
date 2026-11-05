@@ -17,10 +17,12 @@ export function ingestTelemetryPacket(input: unknown) {
 }
 
 export function createTelemetryBatch(inputs: unknown[]): { packets: SensorTelemetryPacket[]; alarms: TelemetryAlarm[] } {
-  return inputs.reduce((batch, input) => {
+  const packets: SensorTelemetryPacket[] = [];
+  const alarms: TelemetryAlarm[] = [];
+  for (const input of inputs) {
     const result = ingestTelemetryPacket(input);
-    batch.packets.push(result.packet);
-    batch.alarms.push(...result.alarms);
-    return batch;
-  }, { packets: [], alarms: [] } as { packets: SensorTelemetryPacket[]; alarms: TelemetryAlarm[] });
+    packets.push(result.packet);
+    alarms.push(...result.alarms);
+  }
+  return { packets, alarms };
 }

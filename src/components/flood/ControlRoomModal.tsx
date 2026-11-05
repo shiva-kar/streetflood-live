@@ -163,7 +163,7 @@ export default function ControlRoomModal({
       setIsSearchingRoads(true);
       searchTimeoutRef.current = setTimeout(async () => {
         try {
-          const places = await searchPlaces(`${val.trim()} road`, mapCenter);
+          const places = await searchPlaces(`${val.trim()} road`);
           const osmPlaces = places.slice(0, 5).map((p) => ({
             name: p.name,
             type: "OSM VERIFIED STREET",
@@ -210,9 +210,9 @@ export default function ControlRoomModal({
         r.name?.toLowerCase().includes(q) ||
         q.includes(r.name?.toLowerCase() || ""),
     );
-    if (match) {
+    if (match && match.coordinates.length > 0) {
       const mid = match.coordinates[Math.floor(match.coordinates.length / 2)];
-      setClosureCoords(mid);
+      if (mid) setClosureCoords(mid);
     }
     setRoadName(corridor);
     setShowSuggestions(false);
@@ -380,32 +380,40 @@ export default function ControlRoomModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-5">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            <ShieldAlert className="w-5 h-5 text-indigo-600" />
-            Authority Control Room & Operations
-          </DialogTitle>
-          <DialogDescription className="text-xs">
+      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-5">
+        <DialogHeader className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-indigo-600 shrink-0" />
+            <DialogTitle className="text-lg sm:text-xl font-bold">
+              Authority Control Room & Operations
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-xs text-muted-foreground">
             Manage official road closures, verify citizen reports, and broadcast targeted flood alerts.
           </DialogDescription>
-          <Button type="button" variant="outline" size="sm" onClick={downloadIncidentFeed} className="w-full text-xs">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={downloadIncidentFeed}
+            className="w-full text-xs h-8 mt-1 gap-1.5"
+          >
             Export Incident Feed (GeoJSON + CAP)
           </Button>
         </DialogHeader>
 
-        <Tabs defaultValue="closures" className="w-full mt-2">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="closures" className="text-xs">
-              Road Closures ({incidents.length})
+        <Tabs defaultValue="closures" className="w-full mt-1">
+          <TabsList className="grid w-full grid-cols-4 h-9 p-1">
+            <TabsTrigger value="closures" className="text-[11px] sm:text-xs py-1 px-1 truncate">
+              Closures ({incidents.length})
             </TabsTrigger>
-            <TabsTrigger value="moderation" className="text-xs">
-              Moderation ({pendingReports.length})
+            <TabsTrigger value="moderation" className="text-[11px] sm:text-xs py-1 px-1 truncate">
+              Review ({pendingReports.length})
             </TabsTrigger>
-            <TabsTrigger value="dispatch" className="text-xs">
+            <TabsTrigger value="dispatch" className="text-[11px] sm:text-xs py-1 px-1 truncate">
               Dispatch
             </TabsTrigger>
-            <TabsTrigger value="alerts" className="text-xs">
+            <TabsTrigger value="alerts" className="text-[11px] sm:text-xs py-1 px-1 truncate">
               Alerts
             </TabsTrigger>
           </TabsList>
@@ -626,7 +634,7 @@ export default function ControlRoomModal({
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-foreground truncate">{inc.description}</p>
                         <p className="text-[10px] text-muted-foreground">
-                          {inc.status} • {inc.lat.toFixed(4)}, {inc.lng.toFixed(4)}
+                          {inc.status} • {inc.lat != null && inc.lng != null ? `${inc.lat.toFixed(4)}, ${inc.lng.toFixed(4)}` : "Sector Landmark"}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">

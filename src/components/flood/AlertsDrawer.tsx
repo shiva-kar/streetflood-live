@@ -65,7 +65,7 @@ export default function AlertsDrawer({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="h-full w-full max-w-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-[10000] animate-in slide-in-from-right duration-200">
+      <div className="h-full w-full max-w-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-[10000] animate-in slide-in-from-right duration-200 overflow-x-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
           <div className="flex items-center gap-3">

@@ -1,5 +1,7 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "streetflood-live",
+  "version": "2.0.0",
+  "description": "Hyperlocal street flood monitoring, predictive early warning, and safe evacuation routing platform.",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -91,6 +93,7 @@
     "jsdom": "^20.0.3",
     "nitro": "3.0.260603-beta",
     "prettier": "^3.7.3",
+    "puppeteer-core": "^25.16.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "8.1.5",

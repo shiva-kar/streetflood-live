@@ -233,7 +233,13 @@ export async function vote(reportId: string, kind: "confirm" | "clear") {
   if (!isShared) {
     const s = loadLocal();
     const r = s.reports.find((x) => x.id === reportId);
-    if (r) kind === "confirm" ? r.confirms++ : r.clears++;
+    if (r) {
+      if (kind === "confirm") {
+        r.confirms++;
+      } else {
+        r.clears++;
+      }
+    }
     saveLocal(s);
     return;
   }

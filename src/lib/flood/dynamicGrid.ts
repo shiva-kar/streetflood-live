@@ -191,8 +191,10 @@ export function generateViewportTiles(
   // Index active incidents by snapped tile ID
   const incidentsByTile = new Map<string, RoadIncident>();
   for (const inc of incidents) {
-    const tid = tileIdFromLatLng(inc.lat, inc.lng);
-    incidentsByTile.set(tid, inc);
+    if (inc.lat != null && inc.lng != null) {
+      const tid = tileIdFromLatLng(inc.lat, inc.lng);
+      incidentsByTile.set(tid, inc);
+    }
   }
 
   const tiles: Tile[] = [];

@@ -66,7 +66,7 @@ export default function NearbySheltersDrawer({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-5">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-4 sm:p-5">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-emerald-600" />

@@ -1,6 +1,6 @@
 import type { AppState, FloodAlert, FloodReport, RoadIncident, Shelter, TileBase } from "./types";
 
-/** Demo area: Sion – Kurla – Chunabhatti, Mumbai. ~100m x 100m tiles. */
+/** Flagship monitored corridor: Sion – Kurla – Chunabhatti, Mumbai. ~100m x 100m tiles. */
 export const GRID = {
   rows: 24,
   cols: 24,

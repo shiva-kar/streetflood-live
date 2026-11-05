@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { runBobCivicAgent } from "@/lib/ai/bengaluruAgent";
+import { runBobCivicAgent, runCivicAiAgent } from "@/lib/ai/bengaluruAgent";
 import type { FloodReport, RoadIncident } from "@/lib/flood/types";
 
-describe("IBM Bob Civic Agentic Engine for Bengaluru", () => {
+describe("StreetFlood Civic AI Agentic Engine", () => {
   const mockUserPos: [number, number] = [12.9716, 77.5946]; // Bengaluru Center
 
   const mockIncidents: RoadIncident[] = [

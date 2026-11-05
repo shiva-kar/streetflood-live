@@ -20,15 +20,46 @@ function load(): AppState {
   return seedState(Date.now());
 }
 
-function persist() {
+let persistTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function saveToLocalStorage(appState: AppState) {
   try {
-    const serialized = JSON.stringify(state);
+    const serialized = JSON.stringify(appState);
     window.localStorage.setItem(KEY, serialized);
     window.localStorage.setItem(ALIAS_KEY, serialized);
   } catch {
-    // Storage quota (large photos) – keep in memory, warn once.
-    console.warn("StreetFlood: could not persist state (storage full)");
+    // If QuotaExceededError, attempt saving without large photo data URLs
+    try {
+      const strippedState: AppState = {
+        ...appState,
+        reports: appState.reports.map((r) => {
+          if (r.photoUrl && r.photoUrl.length > 5000) {
+            return { ...r, photoUrl: undefined };
+          }
+          return r;
+        }),
+      };
+      const compactSerialized = JSON.stringify(strippedState);
+      window.localStorage.setItem(KEY, compactSerialized);
+      window.localStorage.setItem(ALIAS_KEY, compactSerialized);
+      console.warn("StreetFlood: Persisted state with pruned photos due to storage quota");
+    } catch {
+      console.warn("StreetFlood: Could not persist state to localStorage (storage full)");
+    }
   }
+}
+
+function persist(immediate = false) {
+  if (typeof window === "undefined") return;
+  if (immediate) {
+    if (persistTimeout) clearTimeout(persistTimeout);
+    if (state) saveToLocalStorage(state);
+    return;
+  }
+  if (persistTimeout) clearTimeout(persistTimeout);
+  persistTimeout = setTimeout(() => {
+    if (state) saveToLocalStorage(state);
+  }, 100);
 }
 
 export function getState(): AppState {
@@ -42,11 +73,13 @@ export function setState(fn: (s: AppState) => AppState) {
   listeners.forEach((l) => l());
 }
 
-export function resetDemo() {
+export function resetScenario() {
   state = seedState(Date.now());
-  persist();
+  persist(true);
   listeners.forEach((l) => l());
 }
+
+export const resetDemo = resetScenario;
 
 function subscribe(l: () => void) {
   listeners.add(l);

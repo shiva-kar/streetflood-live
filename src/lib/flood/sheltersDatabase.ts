@@ -1,5 +1,6 @@
 import { BENGALURU_EXPANDED_SHELTERS } from "./bengaluruShelters";
 import type { Shelter } from "./types";
+export type { Shelter } from "./types";
 
 /**
  * Computes exact great-circle distance between two coordinates in kilometers using the Haversine formula.
@@ -2265,8 +2266,14 @@ export const COMPREHENSIVE_SHELTERS: Shelter[] = [...BENGALURU_EXPANDED_SHELTERS
 );
 
 /**
+ * Lean array of essential flagship corridor shelters for ultra-fast initial UI rendering.
+ */
+export const ESSENTIAL_FLAGSHIP_SHELTERS: Shelter[] = BASE_SHELTERS.slice(0, 12);
+
+/**
  * Finds the nearest known emergency shelters from the database relative to any coordinates worldwide.
  * Sorts strictly by geodesic distance (km) using Haversine formula.
+ * Optimized: eliminates massive intermediate object allocations and string formatting before top-N slicing.
  */
 export function findNearestKnownShelters(
   lat: number,
@@ -2274,21 +2281,51 @@ export function findNearestKnownShelters(
   limit = 5,
   capabilities: Partial<Pick<Shelter, "drinkingWater" | "medicalAid" | "wheelchairAccessible" | "petFriendly">> = {},
 ): Array<Shelter & { distanceKm: number; distanceLabel: string }> {
-  if (isNaN(lat) || isNaN(lng)) return [];
+  if (isNaN(lat) || isNaN(lng) || limit <= 0) return [];
 
-  const withDistances = COMPREHENSIVE_SHELTERS.filter((s) =>
-    Object.entries(capabilities).every(([key, required]) => !required || s[key as keyof Shelter] === true),
-  ).map((s) => {
-    const distanceKm = getHaversineDistanceKm(lat, lng, s.lat, s.lng);
-    return {
-      ...s,
-      distanceKm,
-      distanceLabel: formatDistanceString(distanceKm),
-    };
-  });
+  const checkCaps = Object.entries(capabilities).filter(([, req]) => Boolean(req));
+  const candidates: Array<{ shelter: Shelter; dist: number }> = [];
 
-  withDistances.sort((a, b) => a.distanceKm - b.distanceKm);
-  return withDistances.slice(0, limit);
+  for (let i = 0; i < COMPREHENSIVE_SHELTERS.length; i++) {
+    const s = COMPREHENSIVE_SHELTERS[i];
+    if (checkCaps.length > 0) {
+      let match = true;
+      for (let j = 0; j < checkCaps.length; j++) {
+        const [k] = checkCaps[j];
+        if (s[k as keyof Shelter] !== true) {
+          match = false;
+          break;
+        }
+      }
+      if (!match) continue;
+    }
+
+    const dist = getHaversineDistanceKm(lat, lng, s.lat, s.lng);
+    candidates.push({ shelter: s, dist });
+  }
+
+  candidates.sort((a, b) => a.dist - b.dist);
+  const top = candidates.slice(0, limit);
+
+  return top.map((item) => ({
+    ...item.shelter,
+    distanceKm: item.dist,
+    distanceLabel: formatDistanceString(item.dist),
+  }));
+}
+
+/**
+ * Asynchronously finds nearest shelters, yielding to the microtask queue
+ * to ensure that massive queries never block the browser main UI thread.
+ */
+export async function findNearestKnownSheltersAsync(
+  lat: number,
+  lng: number,
+  limit = 5,
+  capabilities: Partial<Pick<Shelter, "drinkingWater" | "medicalAid" | "wheelchairAccessible" | "petFriendly">> = {},
+): Promise<Array<Shelter & { distanceKm: number; distanceLabel: string }>> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return findNearestKnownShelters(lat, lng, limit, capabilities);
 }
 
 export { BENGALURU_EXPANDED_SHELTERS } from "./bengaluruShelters";

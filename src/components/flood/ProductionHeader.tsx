@@ -1,5 +1,18 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, MapPin, Locate, Globe, User, ShieldCheck, X, Loader2, AlertTriangle, Bell, Volume2 } from "lucide-react";
+import {
+  Search,
+  MapPin,
+  Locate,
+  Globe,
+  User,
+  ShieldCheck,
+  X,
+  Loader2,
+  AlertTriangle,
+  Bell,
+  Volume2,
+  Bot,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,9 +26,7 @@ import { getLanguage, setLanguage, useI18n, type Language } from "@/lib/i18n";
 import type { UserProfile } from "@/lib/supabase/client";
 import { speakAlert } from "@/lib/flood/voiceAnnouncer";
 
-interface ProductionHeaderProps {
-  onOpenIbmBobShowcase?: () => void;
-  onOpenIbmBobCopilot?: () => void;
+export interface ProductionHeaderProps {
   onSelectPlace: (lat: number, lng: number, name: string) => void;
   onLocateUser: () => void;
   isLocating: boolean;
@@ -23,12 +34,21 @@ interface ProductionHeaderProps {
   onOpenAuth: () => void;
   onOpenControlRoom?: () => void;
   canAccessControlRoom: boolean;
-  demoMode?: boolean;
+  isEvaluationMode?: boolean;
   onOpenAlerts?: () => void;
   onOpenHelp?: () => void;
   alertCount?: number;
   criticalAlert?: string | undefined;
   activeCityName?: string;
+  reports?: import("@/lib/flood/types").FloodReport[];
+  offlineQueuedCount?: number;
+  onOpenCivicAssistant?: () => void;
+  /** Deprecated alias */
+  demoMode?: boolean;
+  /** Deprecated alias */
+  onOpenIbmBobShowcase?: () => void;
+  /** Deprecated alias */
+  onOpenIbmBobCopilot?: () => void;
 }
 
 export default function ProductionHeader({
@@ -44,7 +64,7 @@ export default function ProductionHeader({
   alertCount = 0,
   criticalAlert,
   activeCityName,
-  onOpenIbmBobShowcase,
+  onOpenCivicAssistant,
   onOpenIbmBobCopilot,
 }: ProductionHeaderProps) {
   const t = useI18n();
@@ -54,6 +74,8 @@ export default function ProductionHeader({
   const [isFocused, setIsFocused] = useState(false);
   const searchTimeoutRef = useRef<number | null>(null);
   const currentLang = getLanguage();
+
+  const handleOpenAi = onOpenCivicAssistant || onOpenIbmBobCopilot;
 
   // Debounced search
   useEffect(() => {
@@ -91,7 +113,7 @@ export default function ProductionHeader({
   return (
     <header className="relative z-30 w-full px-3 pt-3 pb-1.5 sm:px-4">
       <div className="flex items-center gap-2 w-full">
-        {/* LOGO & BRAND */}
+        {/* LOGO & BRAND WITH 1-CLICK CORRIDOR SWITCHER */}
         <div className="flex items-center gap-2 shrink-0 rounded-xl border border-border bg-background/95 px-2.5 py-2 shadow-sm backdrop-blur-md sm:px-3">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
             SF
@@ -99,15 +121,56 @@ export default function ProductionHeader({
           <span className="hidden text-sm font-bold tracking-tight text-foreground sm:inline">
             StreetFlood<span className="text-primary font-normal">.Live</span>
           </span>
-          {activeCityName ? (
-            <span className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground md:inline truncate max-w-[140px]">
-              {activeCityName}
-            </span>
-          ) : (
-            <span className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground md:inline">
-              Live Civic Monitor
-            </span>
-          )}
+
+          {/* 1-CLICK FLAGSHIP CORRIDOR SWITCHER */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground hover:text-foreground md:flex items-center gap-1 cursor-pointer transition-colors"
+                title="Switch Flagship Corridor"
+              >
+                <span className="truncate max-w-[130px]">
+                  {activeCityName
+                    ? activeCityName
+                        .replace(" (Sion-Kurla Corridor)", "")
+                        .replace(" (Tech Corridors)", "")
+                    : "Mumbai"}
+                </span>
+                <span className="text-[9px] text-primary">▼</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64 p-1.5 shadow-xl">
+              <DropdownMenuItem
+                onClick={() => onSelectPlace(19.0508, 72.8714, "Mumbai (Sion-Kurla Corridor)")}
+                className="flex flex-col items-start gap-0.5 cursor-pointer rounded-lg p-2 hover:bg-muted"
+              >
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-bold text-xs text-foreground">
+                    Mumbai (Monsoon Corridor)
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground pl-5">
+                  936 OSM road segments & Sion-Kurla micro-grid
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSelectPlace(12.9716, 77.5946, "Bengaluru (Tech Corridors)")}
+                className="flex flex-col items-start gap-0.5 cursor-pointer rounded-lg p-2 hover:bg-muted"
+              >
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                  <span className="font-bold text-xs text-foreground">
+                    Bengaluru (Tech Corridors)
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground pl-5">
+                  Outer Ring Road, Silk Board & BBMP shelters
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* SEARCH BAR (WORLDWIDE OPEN-WORLD SEARCH) */}
@@ -121,7 +184,7 @@ export default function ProductionHeader({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setTimeout(() => setIsFocused(false), 250)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && results.length > 0) {
+                if (e.key === "Enter" && results.length > 0 && results[0]) {
                   e.preventDefault();
                   handleSelectResult(results[0]);
                 }
@@ -152,7 +215,10 @@ export default function ProductionHeader({
                 <button
                   key={r.placeId}
                   type="button"
-                  onMouseDown={(e) => { e.preventDefault(); handleSelectResult(r); }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectResult(r);
+                  }}
                   onClick={() => handleSelectResult(r)}
                   className="w-full px-3.5 py-2.5 text-left hover:bg-muted/60 transition-colors flex items-start gap-2.5 border-b last:border-b-0 cursor-pointer"
                 >
@@ -174,7 +240,7 @@ export default function ProductionHeader({
           onClick={onLocateUser}
           disabled={isLocating}
           title={t.useMyLocation}
-          className="h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hover:text-primary transition-colors"
+          className="h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm hover:text-primary transition-colors cursor-pointer"
         >
           {isLocating ? (
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -183,13 +249,26 @@ export default function ProductionHeader({
           )}
         </Button>
 
+        {/* CIVIC AI ASSISTANT BUTTON (DESKTOP) */}
+        {handleOpenAi && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenAi}
+            className="hidden lg:inline-flex h-11 shrink-0 gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur-md hover:bg-sky-500/20 cursor-pointer"
+          >
+            <Bot className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+            <span className="hidden xl:inline">Civic AI</span>
+          </Button>
+        )}
+
         {/* LANGUAGE SWITCHER */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size="icon"
-              className="hidden h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm sm:inline-flex"
+              className="hidden h-11 w-11 rounded-xl shrink-0 bg-background/95 backdrop-blur-md border shadow-sm sm:inline-flex cursor-pointer"
             >
               <Globe className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -228,7 +307,7 @@ export default function ProductionHeader({
             variant="outline"
             size="sm"
             onClick={onOpenAlerts}
-            className="relative hidden h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md md:inline-flex"
+            className="relative hidden h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md md:inline-flex cursor-pointer"
           >
             <Bell className="w-4 h-4 text-primary" />
             <span className="hidden lg:inline">{t.tabAlerts}</span>
@@ -245,7 +324,7 @@ export default function ProductionHeader({
             variant="outline"
             size="icon"
             onClick={() => speakAlert(criticalAlert, currentLang)}
-            className="hidden h-11 w-11 shrink-0 rounded-xl border border-border bg-background/95 shadow-sm backdrop-blur-md md:inline-flex"
+            className="hidden h-11 w-11 shrink-0 rounded-xl border border-border bg-background/95 shadow-sm backdrop-blur-md md:inline-flex cursor-pointer"
             title="Listen to critical alert"
             aria-label="Listen to critical alert"
           >
@@ -259,7 +338,7 @@ export default function ProductionHeader({
             variant="default"
             size="sm"
             onClick={onOpenHelp}
-            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-red-700 px-3.5 text-xs font-bold text-white shadow-sm hover:bg-red-800 sm:inline-flex"
+            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-red-700 px-3.5 text-xs font-bold text-white shadow-sm hover:bg-red-800 sm:inline-flex cursor-pointer"
           >
             <AlertTriangle className="w-4 h-4" />
             <span>112 Help</span>
@@ -271,8 +350,9 @@ export default function ProductionHeader({
           <Button
             variant="default"
             size="sm"
-            onClick={onOpenControlRoom} data-testid="control-room-button"
-            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-slate-800 px-3 text-xs font-semibold text-white shadow-sm hover:bg-slate-900 md:flex"
+            onClick={onOpenControlRoom}
+            data-testid="control-room-button"
+            className="hidden h-11 shrink-0 gap-1.5 rounded-xl bg-slate-800 px-3 text-xs font-semibold text-white shadow-sm hover:bg-slate-900 md:flex cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4" />
             <span>{t.controlRoom || "Control Room"}</span>
@@ -284,7 +364,7 @@ export default function ProductionHeader({
           variant="outline"
           size="sm"
           onClick={onOpenAuth}
-          className="h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md"
+          className="h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold shadow-sm backdrop-blur-md cursor-pointer"
         >
           <User className="w-4 h-4 text-muted-foreground" />
           <span className="hidden sm:inline">

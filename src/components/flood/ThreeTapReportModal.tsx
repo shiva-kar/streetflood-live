@@ -145,7 +145,7 @@ export default function ThreeTapReportModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[92vh] overflow-y-auto p-5">
+      <DialogContent className="sm:max-w-md max-h-[92vh] overflow-y-auto overflow-x-hidden p-4 sm:p-5">
         <DialogHeader className="space-y-1">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold text-red-600 dark:text-red-400">
             <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />

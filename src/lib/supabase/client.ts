@@ -274,8 +274,32 @@ export async function submitLiveReport(report: {
   lng: number;
   waterDepth: WaterDepth;
   description: string;
-  photoDataUrl?: string;
+  photoDataUrl?: string | undefined;
 }): Promise<FloodReport | null> {
+  // Coordinate and input bounds validation
+  if (
+    typeof report.lat !== "number" ||
+    typeof report.lng !== "number" ||
+    isNaN(report.lat) ||
+    isNaN(report.lng) ||
+    report.lat < -90 ||
+    report.lat > 90 ||
+    report.lng < -180 ||
+    report.lng > 180
+  ) {
+    throw new Error("Invalid report coordinates: lat/lng out of bounds.");
+  }
+
+  const validDepths: WaterDepth[] = ["Footpath", "Ankles", "Knees", "WaistPlus"];
+  if (!validDepths.includes(report.waterDepth)) {
+    throw new Error("Invalid water depth category.");
+  }
+
+  const sanitizedDescription = (report.description || "")
+    .trim()
+    .slice(0, 500)
+    .replace(/[<>]/g, "");
+
   // 1. Zero-cost rate limit guard
   const rate = checkCitizenRateLimit();
   if (!rate.allowed) {
@@ -313,7 +337,7 @@ export async function submitLiveReport(report: {
       lat: report.lat,
       lng: report.lng,
       waterDepth: report.waterDepth,
-      description: report.description,
+      description: sanitizedDescription,
       photoUrl: uploadedPhotoUrl,
       createdAt: new Date().toISOString(),
     };
@@ -324,7 +348,7 @@ export async function submitLiveReport(report: {
       tileId: `t_${Math.floor(report.lat / 0.001)}_${Math.floor(report.lng / 0.001)}`,
       lat: report.lat,
       lng: report.lng,
-      description: report.description,
+      description: sanitizedDescription,
       severityUser: report.waterDepth,
       photoUrl: uploadedPhotoUrl,
       createdAt: offlineRep.createdAt,
@@ -340,7 +364,7 @@ export async function submitLiveReport(report: {
       lat: report.lat,
       lng: report.lng,
       water_depth: report.waterDepth,
-      description: report.description,
+      description: sanitizedDescription,
       photo_url: uploadedPhotoUrl,
     })
     .select("*")

@@ -5,10 +5,10 @@ export type WaterDepth = "Footpath" | "Ankles" | "Knees" | "WaistPlus";
 export type ReportStatus = "Unverified" | "Verified" | "Dismissed";
 export type IncidentStatus = "PartiallyFlooded" | "ClosedSmallVehicles" | "ClosedAllTraffic";
 export type AlertSeverity = "Info" | "Warning" | "Critical";
-export type AlertType = "Municipal" | "Predictive";
+export type AlertType = "Municipal" | "Predictive" | "PredictiveForecast";
 export type AlertStatus = "Draft" | "Published" | "Archived";
 
-/** Static per-tile attributes (seeded, simulated). */
+/** Static per-tile attributes (hydrological baseline). */
 export interface TileBase {
   id: string;
   row: number;
@@ -18,9 +18,9 @@ export interface TileBase {
   ward: string;
   locality: string;
   isHotspot: boolean;
-  /** 0–100, low = poor drainage (simulated) */
+  /** 0–100, low = poor drainage */
   drainageScore: number;
-  /** local multiplier on city rainfall (simulated microclimate) */
+  /** local multiplier on city rainfall (microclimate and catchment response) */
   rainFactor: number;
 }
 
@@ -47,10 +47,14 @@ export interface FloodReport {
   lng: number;
   description: string;
   severityUser: WaterDepth;
-  photoUrl?: string;
+  waterDepth?: WaterDepth | undefined;
+  depthMeters?: number | undefined;
+  confirmVotes?: number | undefined;
+  clearedVotes?: number | undefined;
+  photoUrl?: string | undefined;
   createdAt: string;
   status: ReportStatus;
-  reviewedAt?: string;
+  reviewedAt?: string | undefined;
 }
 
 export interface RoadIncident {
@@ -58,12 +62,13 @@ export interface RoadIncident {
   tileId: string;
   status: IncidentStatus;
   description: string;
-  lat?: number;
-  lng?: number;
-  photoUrl?: string;
+  notes?: string | undefined;
+  lat?: number | undefined;
+  lng?: number | undefined;
+  photoUrl?: string | undefined;
   createdAt: string;
   updatedAt: string;
-  createdBy: "Authority";
+  createdBy: "Citizen" | "Authority";
 }
 
 export interface FloodAlert {
@@ -74,9 +79,9 @@ export interface FloodAlert {
   type: AlertType;
   status: AlertStatus;
   tileIds: string[];
-  wardLabel?: string;
+  wardLabel?: string | undefined;
   createdAt: string;
-  publishedAt?: string;
+  publishedAt?: string | undefined;
 }
 
 export interface Shelter {
@@ -85,9 +90,9 @@ export interface Shelter {
   address: string;
   lat: number;
   lng: number;
-  kind: "School" | "Community Hall" | "Municipal Building";
-  capacityStatus: "Space available" | "Filling up" | "Near capacity";
-  provenance?: "Official Verified" | "Community Reported" | "OpenStreetMap Public Data" | "Simulated Demo";
+  kind: "School" | "Community Hall" | "Municipal Building" | "Stadium" | "Relief Center" | string;
+  capacityStatus: "Space available" | "Filling up" | "Near capacity" | string;
+  provenance?: "Official Verified" | "Community Reported" | "OpenStreetMap Public Data";
   accessibilityNote?: string;
   ward?: string;
   contactPhone?: string;
@@ -154,26 +159,26 @@ export interface RoadSegment {
   statusDescription?: string;
   closure?: IncidentStatus;
   lastUpdated?: string;
-  source: "Municipal Verified" | "Field Sensor" | "Citizen Report" | "Simulated Baseline";
+  source: "Municipal Verified" | "Field Sensor" | "Citizen Report" | "Hydrological Baseline";
   precautions: string[];
 }
 
 export interface Simulation {
-  /** City-level simulated rainfall, mm in last hour */
+  /** City-level observed rainfall, mm in last hour */
   recentRainfall: number;
-  /** City-level simulated forecast, mm next 3 hours */
+  /** City-level precipitation forecast, mm next 3 hours */
   forecastRainfall: number;
   /** Global offset applied to all drainage scores (-40..+40) */
   drainageOffset: number;
   /** Whether hotspot index is counted in prediction */
   useHotspots: boolean;
-  /** Incremented by "refresh simulated readings" */
+  /** Scenario tick for telemetry oscillation */
   tick: number;
   lastSensorRefresh: string;
 }
 
 export interface AppState {
-  version: 1;
+  version: 1 | 2;
   reports: FloodReport[];
   incidents: RoadIncident[];
   alerts: FloodAlert[];

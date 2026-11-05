@@ -383,3 +383,5 @@ export async function runBobCivicAgent(
     ],
   };
 }
+
+export const runCivicAiAgent = runBobCivicAgent;

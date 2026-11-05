@@ -5,6 +5,7 @@ const LOCALE: Record<Language, string> = {
   en: "en-IN",
   hi: "hi-IN",
   mr: "mr-IN",
+  kn: "kn-IN",
 };
 
 export function speakAlert(text: string, lang: Language = "en") {
@@ -23,5 +24,3 @@ export function speakTurnInstruction(step: RoadRouteStep, lang: Language = "en")
 export function cancelVoiceAnnouncements() {
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
 }
-
-export type { EvacuationMode };

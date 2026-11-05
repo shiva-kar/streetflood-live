@@ -38,7 +38,7 @@ export default function EmergencyHelpModal({ open, onClose }: EmergencyHelpModal
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-5">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-red-600">
             <LifeBuoy className="w-5 h-5 text-red-600" />

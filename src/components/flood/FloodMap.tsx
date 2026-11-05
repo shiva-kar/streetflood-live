@@ -145,9 +145,9 @@ export default function FloodMap(props: FloodMapProps) {
       propsRef.current.onTileClick(tid, e.latlng.lat, e.latlng.lng);
     });
 
-    m.on("dragstart zoomstart movestart", (e: any) => {
+    m.on("dragstart zoomstart movestart", (e: LType.LeafletEvent) => {
       // If user starts manual drag/zoom, halt any programmatic animation immediately
-      if (e?.originalEvent) {
+      if ("originalEvent" in e && e.originalEvent) {
         isUserInteracting.current = true;
         m.stop();
       }
@@ -185,7 +185,7 @@ export default function FloodMap(props: FloodMapProps) {
     m.on("moveend", emitViewport);
     map.current = m;
     if (typeof window !== "undefined") {
-      (window as any).__leafletMap = m;
+      (window as unknown as { __leafletMap?: LType.Map }).__leafletMap = m;
     }
 
     setTimeout(() => {
@@ -220,7 +220,7 @@ export default function FloodMap(props: FloodMapProps) {
       m.remove();
       map.current = null;
       if (typeof window !== "undefined") {
-        delete (window as any).__leafletMap;
+        delete (window as unknown as { __leafletMap?: LType.Map }).__leafletMap;
       }
       currentRects.clear();
     };

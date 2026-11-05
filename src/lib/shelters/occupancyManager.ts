@@ -1,5 +1,6 @@
 export interface ShelterOperations {
   id: string;
+  shelterId?: string;
   totalCapacity: number;
   currentHeadcount: number;
   drinkingWaterLiters: number;
@@ -9,6 +10,8 @@ export interface ShelterOperations {
   physicianOnSite: boolean;
   wheelchairAccessible: boolean;
   petFriendly: boolean;
+  wheelchairPlaces?: number;
+  petCapacity?: number;
 }
 
 export function availableShelterCapacity(shelter: ShelterOperations) {
@@ -18,16 +21,32 @@ export function availableShelterCapacity(shelter: ShelterOperations) {
 export function allocateShelterBeds(shelter: ShelterOperations, requested: number) {
   if (!Number.isInteger(requested) || requested < 1) throw new Error("Requested shelter occupancy must be a positive integer.");
   const available = availableShelterCapacity(shelter);
-  if (requested > available) throw new Error(`Shelter has only ${available} available places.`);
-  return { ...shelter, currentHeadcount: shelter.currentHeadcount + requested };
+  if (requested > available) throw new Error("Insufficient shelter capacity.");
+  return {
+    ...shelter,
+    currentHeadcount: shelter.currentHeadcount + requested,
+  };
 }
 
 export function shelterCanAccept(
   shelter: ShelterOperations,
-  requirements: { wheelchair?: boolean; pets?: boolean; medical?: boolean; people: number },
+  requirements: {
+    people: number;
+    requiresWheelchair?: boolean;
+    wheelchair?: boolean;
+    hasPets?: boolean;
+    pets?: boolean;
+    medical?: boolean;
+    requiresMedical?: boolean;
+  }
 ) {
-  return availableShelterCapacity(shelter) >= requirements.people
-    && (!requirements.wheelchair || shelter.wheelchairAccessible)
-    && (!requirements.pets || shelter.petFriendly)
-    && (!requirements.medical || shelter.physicianOnSite);
+  const needsWheelchair = Boolean(requirements.requiresWheelchair || requirements.wheelchair);
+  const needsPets = Boolean(requirements.hasPets || requirements.pets);
+  const needsMedical = Boolean(requirements.medical || requirements.requiresMedical);
+
+  if (availableShelterCapacity(shelter) < requirements.people) return false;
+  if (needsWheelchair && !shelter.wheelchairAccessible) return false;
+  if (needsPets && !shelter.petFriendly) return false;
+  if (needsMedical && !shelter.physicianOnSite) return false;
+  return true;
 }

@@ -55,6 +55,7 @@ export default function ShelterDetailsModal({
   const remainingBeds = Math.max(0, totalBeds - currentHeadcount);
 
   const ops: ShelterOperations = {
+    id: shelter.id,
     shelterId: shelter.id,
     currentHeadcount,
     totalCapacity: totalBeds,
@@ -62,6 +63,9 @@ export default function ShelterDetailsModal({
     mealPackets: 800,
     generatorHours: 48,
     pediatricFormulaUnits: 120,
+    physicianOnSite: true,
+    wheelchairAccessible: Boolean(shelter.wheelchairAccessible),
+    petFriendly: Boolean(shelter.petFriendly),
     wheelchairPlaces: 40,
     petCapacity: 30,
   };
@@ -90,7 +94,7 @@ export default function ShelterDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-5">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-5">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 gap-1 text-[10px] font-bold">

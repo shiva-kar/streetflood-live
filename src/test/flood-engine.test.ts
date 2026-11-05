@@ -79,6 +79,91 @@ describe("Rule-based Flood Severity Engine", () => {
 
     expect(updatedTile.currentSeverityScore).toBeLessThan(initialTile.currentSeverityScore);
   });
+
+  it("decays reports older than 4 hours and discards reports older than 6 hours", () => {
+    const now = Date.now();
+    const testTileId = "t_10_10";
+    const freshReport: FloodReport = {
+      id: "fresh",
+      tileId: testTileId,
+      lat: 19.04,
+      lng: 72.87,
+      description: "Fresh waterlogging",
+      severityUser: "Knees",
+      createdAt: new Date(now - 30 * 60000).toISOString(),
+      status: "Verified",
+    };
+    const agedReport: FloodReport = {
+      id: "aged",
+      tileId: testTileId,
+      lat: 19.04,
+      lng: 72.87,
+      description: "Aging waterlogging",
+      severityUser: "Knees",
+      createdAt: new Date(now - 300 * 60000).toISOString(),
+      status: "Verified",
+    };
+    const expiredReport: FloodReport = {
+      id: "expired",
+      tileId: testTileId,
+      lat: 19.04,
+      lng: 72.87,
+      description: "Expired waterlogging",
+      severityUser: "Knees",
+      createdAt: new Date(now - 400 * 60000).toISOString(),
+      status: "Verified",
+    };
+
+    const stateFresh: AppState = { ...seedState(now), reports: [freshReport], incidents: [] };
+    const stateAged: AppState = { ...seedState(now), reports: [agedReport], incidents: [] };
+    const stateExpired: AppState = { ...seedState(now), reports: [expiredReport], incidents: [] };
+
+    const scoreFresh = computeTiles(stateFresh, now).find((t) => t.id === testTileId)!.currentSeverityScore;
+    const scoreAged = computeTiles(stateAged, now).find((t) => t.id === testTileId)!.currentSeverityScore;
+    const scoreExpired = computeTiles(stateExpired, now).find((t) => t.id === testTileId)!.currentSeverityScore;
+
+    const tileFresh = computeTiles(stateFresh, now).find((t) => t.id === testTileId)!;
+    const tileAged = computeTiles(stateAged, now).find((t) => t.id === testTileId)!;
+    const tileExpired = computeTiles(stateExpired, now).find((t) => t.id === testTileId)!;
+
+    expect(tileFresh.currentSeverityScore).toBeGreaterThan(tileAged.currentSeverityScore);
+    expect(tileAged.currentSeverityScore).toBeGreaterThan(tileExpired.currentSeverityScore);
+    expect(tileExpired.verifiedReports).toBe(0); // Expired report discarded from count
+    expect(tileExpired.unverifiedReports).toBe(0);
+  });
+
+  it("suppresses duplicate rapid spam reports with identical descriptions", () => {
+    const now = Date.now();
+    const testTileId = "t_10_10";
+    const report1: FloodReport = {
+      id: "sp1",
+      tileId: testTileId,
+      lat: 19.04,
+      lng: 72.87,
+      description: "Identical spam text",
+      severityUser: "WaistPlus",
+      createdAt: new Date(now - 60000).toISOString(),
+      status: "Unverified",
+    };
+    const duplicateSpam: FloodReport = {
+      id: "sp2",
+      tileId: testTileId,
+      lat: 19.04,
+      lng: 72.87,
+      description: "Identical spam text",
+      severityUser: "WaistPlus",
+      createdAt: new Date(now - 30000).toISOString(),
+      status: "Unverified",
+    };
+
+    const stateSingle: AppState = { ...seedState(now), reports: [report1], incidents: [] };
+    const stateWithSpam: AppState = { ...seedState(now), reports: [report1, duplicateSpam], incidents: [] };
+
+    const scoreSingle = computeTiles(stateSingle, now).find((t) => t.id === testTileId)!.currentSeverityScore;
+    const scoreWithSpam = computeTiles(stateWithSpam, now).find((t) => t.id === testTileId)!.currentSeverityScore;
+
+    expect(scoreWithSpam).toBeLessThan(scoreSingle * 2);
+  });
 });
 
 describe("Rule-based 3-Hour Predictive Early Warning System", () => {
@@ -119,7 +204,7 @@ describe("Rule-based 3-Hour Predictive Early Warning System", () => {
 
     expect(alerts.length).toBeGreaterThan(0);
     const firstAlert = alerts[0];
-    expect(firstAlert.type).toBe("PredictiveSimulated");
+    expect(firstAlert.type).toBe("PredictiveForecast");
     expect(firstAlert.title).toContain("Advance warning");
     expect(firstAlert.tileIds.length).toBeGreaterThan(0);
   });

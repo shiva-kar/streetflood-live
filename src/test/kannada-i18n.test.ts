@@ -9,7 +9,7 @@ describe("Kannada (ಕನ್ನಡ) Localization for Bengaluru", () => {
     expect(knTranslations).toBeDefined();
 
     for (const key of enKeys) {
-      const val = (knTranslations as any)[key];
+      const val = (knTranslations as unknown as Record<string, string>)[key];
       expect(val).toBeDefined();
       expect(typeof val).toBe("string");
       expect(val.length).toBeGreaterThan(0);

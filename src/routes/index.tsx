@@ -37,8 +37,7 @@ import { useAppState, getState, setState } from "@/lib/flood/store";
 import { MAP_CENTER, SHELTERS as INITIAL_SHELTERS } from "@/lib/flood/data";
 import { NavigationHUD } from "@/components/routing/NavigationHUD";
 import ShelterDetailsModal from "@/components/flood/ShelterDetailsModal";
-import IbmBobShowcaseModal from "@/components/flood/IbmBobShowcaseModal";
-import IbmBobCivicCopilot from "@/components/flood/IbmBobCivicCopilot";
+import CivicAiAssistant from "@/components/flood/CivicAiAssistant";
 import type { AgentAction } from "@/lib/ai/bengaluruAgent";
 import NearbySheltersDrawer from "@/components/flood/NearbySheltersDrawer";
 import { reverseGeocode } from "@/lib/reporting/reverseGeocoder";
@@ -48,16 +47,27 @@ import type { EvacuationMode, FloodAlert, FloodReport, RoadIncident, Shelter, Ti
 import { toast } from "sonner";
 import { getCurrentTideStatus } from "@/lib/flood/tideData";
 
-const BENGALURU_CENTER: [number, number] = [12.9716, 77.5946];
+export const MUMBAI_CORRIDOR_CENTER: [number, number] = [19.0508, 72.8714];
+export const BENGALURU_CENTER: [number, number] = [12.9716, 77.5946];
 
-const INITIAL_BENGALURU_WEATHER: RealWeatherResult = {
-  recentRainMm: 0,
-  rainRateMmPerHour: 0,
-  forecastRain3hMm: 0,
+export const INITIAL_MUMBAI_WEATHER: RealWeatherResult = {
+  recentRainMm: 86,
+  rainRateMmPerHour: 24,
+  forecastRain3hMm: 117,
   hourlyTimes: ["14:00", "15:00", "16:00", "17:00", "18:00"],
-  hourlyRainMm: [0, 0, 0, 0, 0],
+  hourlyRainMm: [18, 24, 32, 28, 15],
+  temperatureC: 28.5,
+  weatherCode: 65,
+};
+
+export const INITIAL_BENGALURU_WEATHER: RealWeatherResult = {
+  recentRainMm: 24,
+  rainRateMmPerHour: 12,
+  forecastRain3hMm: 45,
+  hourlyTimes: ["14:00", "15:00", "16:00", "17:00", "18:00"],
+  hourlyRainMm: [5, 12, 18, 10, 0],
   temperatureC: 24.5,
-  weatherCode: 2,
+  weatherCode: 61,
 };
 
 function getInitialCivicLocation(): { pos: [number, number]; zoom: number; cityName: string } {
@@ -65,38 +75,39 @@ function getInitialCivicLocation(): { pos: [number, number]; zoom: number; cityN
     try {
       const savedCity = localStorage.getItem("sf_active_city");
       const savedPos = localStorage.getItem("sf_user_pos");
-      // Clean legacy Mumbai or overview cache so default is cleanly Bengaluru
-      if (
-        savedCity === "Mumbai" ||
-        savedCity === "India • National Overview" ||
-        savedCity === "Sion–Kurla"
-      ) {
-        localStorage.removeItem("sf_active_city");
-        localStorage.removeItem("sf_user_pos");
-      } else if (savedPos) {
+      if (savedPos) {
         const parsed = JSON.parse(savedPos);
         if (Array.isArray(parsed) && parsed.length === 2 && !isNaN(parsed[0]) && !isNaN(parsed[1])) {
-          // If legacy default Mumbai coordinates (~19.05, ~72.87), clear them
-          if (Math.abs(parsed[0] - 19.05) < 0.4 && Math.abs(parsed[1] - 72.87) < 0.4) {
-            localStorage.removeItem("sf_active_city");
-            localStorage.removeItem("sf_user_pos");
-          } else if (savedCity && savedCity !== "Monitored Region" && savedCity !== "Mumbai") {
-            return {
-              pos: [parsed[0], parsed[1]],
-              zoom: 13,
-              cityName: savedCity,
-            };
-          }
+          return {
+            pos: [parsed[0], parsed[1]],
+            zoom: 14,
+            cityName: savedCity || "Mumbai (Sion-Kurla Corridor)",
+          };
         }
+      }
+      if (savedCity) {
+        if (savedCity.toLowerCase().includes("bengaluru")) {
+          return {
+            pos: BENGALURU_CENTER,
+            zoom: 13,
+            cityName: "Bengaluru (Tech Corridors)",
+          };
+        }
+        return {
+          pos: MUMBAI_CORRIDOR_CENTER,
+          zoom: 14,
+          cityName: savedCity,
+        };
       }
     } catch {
       // Ignore storage errors
     }
   }
+  // Default to flagship Mumbai Sion-Kurla Corridor (936 OSM segments & densest hydrological data)
   return {
-    pos: BENGALURU_CENTER,
-    zoom: 13,
-    cityName: "Bengaluru",
+    pos: MUMBAI_CORRIDOR_CENTER,
+    zoom: 14,
+    cityName: "Mumbai (Sion-Kurla Corridor)",
   };
 }
 
@@ -110,7 +121,23 @@ export default function StreetFloodApp() {
 
   // User and Auth State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [demoMode, setDemoMode] = useState<boolean>(false);
+  const [isEvaluationMode, setIsEvaluationMode] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sf_evaluation_mode") === "true";
+    }
+    return false;
+  });
+
+  const handleToggleEvaluationMode = (enabled: boolean) => {
+    setIsEvaluationMode(enabled);
+    if (typeof window !== "undefined") {
+      if (enabled) {
+        localStorage.setItem("sf_evaluation_mode", "true");
+      } else {
+        localStorage.removeItem("sf_evaluation_mode");
+      }
+    }
+  };
 
   // User GPS & Center
   const [userPos, setUserPos] = useState<[number, number]>(initialLoc.pos);
@@ -139,7 +166,11 @@ export default function StreetFloodApp() {
   });
 
   // Real Data: Weather, Shelters, Reports, Incidents, Alerts
-  const [weather, setWeather] = useState<RealWeatherResult | null>(INITIAL_BENGALURU_WEATHER);
+  const [weather, setWeather] = useState<RealWeatherResult | null>(
+    initialLoc.cityName.toLowerCase().includes("bengaluru")
+      ? INITIAL_BENGALURU_WEATHER
+      : INITIAL_MUMBAI_WEATHER,
+  );
   const [shelters, setShelters] = useState<Shelter[]>(INITIAL_SHELTERS);
   const [liveReports, setLiveReports] = useState<FloodReport[]>(localState.reports);
   const [liveIncidents, setLiveIncidents] = useState<RoadIncident[]>(localState.incidents);
@@ -173,8 +204,7 @@ export default function StreetFloodApp() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [controlRoomOpen, setControlRoomOpen] = useState(false);
   const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
-  const [ibmBobShowcaseOpen, setIbmBobShowcaseOpen] = useState(false);
-  const [ibmBobCopilotOpen, setIbmBobCopilotOpen] = useState(false);
+  const [civicAssistantOpen, setCivicAssistantOpen] = useState(false);
 
   // 1. Initial User Geolocation
   useEffect(() => {
@@ -186,8 +216,7 @@ export default function StreetFloodApp() {
         // Record GPS position for blue user marker and accurate local distance calculations
         setUserPos([res.lat, res.lng]);
         // Note: We intentionally do NOT call setFocus or setActiveCityName on initial mount!
-        // This keeps the primary view anchored on Bengaluru for IBM Bobathon
-        // and guarantees the user has complete manual pan/zoom control without being hijacked.
+        // Keeps primary view anchored on flagship corridor while preserving full manual pan/zoom control.
       })
       .catch((err) => {
         console.warn("GPS init info:", err.message);
@@ -415,7 +444,9 @@ export default function StreetFloodApp() {
           try {
             localStorage.setItem("sf_active_city", clean);
             localStorage.setItem("sf_user_pos", JSON.stringify([res.lat, res.lng]));
-          } catch {}
+          } catch (storageErr) {
+            console.warn("Could not persist active city in storage:", storageErr);
+          }
         }
       } catch {
         // Fallback
@@ -446,7 +477,9 @@ export default function StreetFloodApp() {
       try {
         localStorage.setItem("sf_active_city", cleanCity);
         localStorage.setItem("sf_user_pos", JSON.stringify([lat, lng]));
-      } catch {}
+      } catch (storageErr) {
+        console.warn("Could not persist active city in storage:", storageErr);
+      }
     }
     toast.info(`Viewing ${name}`);
   };
@@ -454,11 +487,13 @@ export default function StreetFloodApp() {
   const handlePlanRouteToShelter = async (shelter: Shelter) => {
     setHighlightShelterId(shelter.id);
     toast.loading("Calculating safest road route avoiding flood areas...", { id: "routing" });
-    const blocked = liveIncidents.map((i) => ({
-      lat: i.lat,
-      lng: i.lng,
-      description: i.description,
-    }));
+    const blocked = liveIncidents
+      .filter((i): i is RoadIncident & { lat: number; lng: number } => typeof i.lat === "number" && typeof i.lng === "number")
+      .map((i) => ({
+        lat: i.lat,
+        lng: i.lng,
+        description: i.description,
+      }));
 
     const result = await calculateWorldwideSafeRoute(referenceCoord, [shelter.lat, shelter.lng], blocked, evacuationMode);
     toast.dismiss("routing");
@@ -476,22 +511,25 @@ export default function StreetFloodApp() {
         setUserPos([action.lat, action.lng]);
         setFocus({ lat: action.lat, lng: action.lng, zoom: action.zoom || 15, key: Date.now() });
       } else if (action.type === "navigate" && action.lat != null && action.lng != null) {
-        calculateWorldwideSafeRoute(
-          { lat: userPos[0], lng: userPos[1] },
-          { lat: action.lat, lng: action.lng },
-          dynamicTiles,
-          liveReports,
-          liveIncidents,
-          evacuationMode,
-        ).then((res) => {
-          setRoadRoute(res);
-          toast.success("Calculated safe road route");
+        const dest: [number, number] = [action.lat, action.lng];
+        const blocked = liveIncidents
+          .filter((i): i is RoadIncident & { lat: number; lng: number } => typeof i.lat === "number" && typeof i.lng === "number")
+          .map((i) => ({
+            lat: i.lat,
+            lng: i.lng,
+            description: i.description,
+          }));
+        calculateWorldwideSafeRoute(referenceCoord, dest, blocked, evacuationMode).then((res) => {
+          if (res) {
+            setRoadRoute(res);
+            toast.success("Calculated safe road route");
+          }
         });
       } else if (action.type === "call" && action.phone) {
         window.location.href = `tel:${action.phone}`;
       }
     },
-    [userPos, dynamicTiles, liveReports, liveIncidents, evacuationMode],
+    [referenceCoord, liveIncidents, evacuationMode],
   );
 
   const handleRemoveIncident = (id: string) => {
@@ -534,12 +572,10 @@ export default function StreetFloodApp() {
   };
 
   const canAccessControlRoom =
-    import.meta.env.DEV ||
-    (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) ||
     currentUser?.role === "authority" ||
-    currentUser?.role === "moderator" ||
     currentUser?.role === "admin" ||
-    demoMode;
+    currentUser?.role === "moderator" ||
+    isEvaluationMode;
 
   return (
     <div
@@ -555,7 +591,7 @@ export default function StreetFloodApp() {
         onOpenAuth={() => setAuthModalOpen(true)}
         onOpenControlRoom={() => setControlRoomOpen(true)}
         canAccessControlRoom={canAccessControlRoom}
-        demoMode={demoMode}
+        isEvaluationMode={isEvaluationMode}
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenHelp={() => setHelpModalOpen(true)}
         alertCount={activeAlerts.length}
@@ -563,8 +599,7 @@ export default function StreetFloodApp() {
         reports={liveReports}
         offlineQueuedCount={offlineQueuedCount}
         activeCityName={activeCityName}
-        onOpenIbmBobShowcase={() => setIbmBobShowcaseOpen(true)}
-        onOpenIbmBobCopilot={() => setIbmBobCopilotOpen(true)}
+        onOpenCivicAssistant={() => setCivicAssistantOpen(true)}
       />
 
       {/* 2. FULLSCREEN MAP */}
@@ -579,7 +614,7 @@ export default function StreetFloodApp() {
           focus={focus}
           selectedTileId={selectedTileId}
           highlightShelterId={highlightShelterId}
-          roadRouteCoords={roadRoute?.coordinates}
+          roadRouteCoords={roadRoute?.coordinates ?? null}
           roadRouteSafety={roadRoute?.safetyStatus}
           showPredicted={true}
           layerOptions={layerOptions}
@@ -640,6 +675,7 @@ export default function StreetFloodApp() {
         activeCityName={activeCityName}
         isNationalView={viewportBounds.zoom < 11}
         onSelectCity={(city, lat, lng) => handleSelectPlace(lat, lng, city)}
+        onOpenCivicAssistant={() => setCivicAssistantOpen(true)}
       />
 
       {/* 4. BOTTOM 4-TAB NAVIGATION DOCK */}
@@ -670,8 +706,8 @@ export default function StreetFloodApp() {
         onClose={() => setAuthModalOpen(false)}
         currentUser={currentUser}
         onUserChange={refreshAuth}
-        demoMode={demoMode}
-        onToggleDemoMode={(val) => setDemoMode(val)}
+        isEvaluationMode={isEvaluationMode}
+        onToggleEvaluationMode={handleToggleEvaluationMode}
       />
 
       <EmergencyHelpModal
@@ -718,12 +754,23 @@ export default function StreetFloodApp() {
         viewportTileIds={new Set(dynamicTiles.map((t) => t.id))}
         onClose={() => setAlertsDrawerOpen(false)}
         onSelectAlertTiles={(tids) => {
-          if (tids.length > 0) setSelectedTileId(tids[0]);
+          if (tids.length > 0 && tids[0]) setSelectedTileId(tids[0]);
         }}
         onOpenPreparedness={() => {
           setAlertsDrawerOpen(false);
           setHelpModalOpen(true);
         }}
+      />
+
+      <CivicAiAssistant
+        open={civicAssistantOpen}
+        onOpenChange={setCivicAssistantOpen}
+        userPos={userPos}
+        weather={weather}
+        reports={liveReports}
+        incidents={liveIncidents}
+        onExecuteAction={handleExecuteAgentAction}
+        activeCityName={activeCityName}
       />
     </div>
   );

@@ -1,10 +1,25 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Mail, Database, CheckCircle2, AlertCircle, LogOut } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  ShieldCheck,
+  Mail,
+  Database,
+  CheckCircle2,
+  LogOut,
+  UserCheck,
+  Building2,
+} from "lucide-react";
 import {
   getStoredSupabaseConfig,
   isSupabaseConfigured,
@@ -16,13 +31,17 @@ import {
 } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
-interface AuthModalProps {
+export interface AuthModalProps {
   open: boolean;
   onClose: () => void;
   currentUser: UserProfile | null;
   onUserChange: () => void;
-  demoMode: boolean;
-  onToggleDemoMode: (enabled: boolean) => void;
+  isEvaluationMode?: boolean;
+  onToggleEvaluationMode?: (enabled: boolean) => void;
+  /** Deprecated alias */
+  demoMode?: boolean;
+  /** Deprecated alias */
+  onToggleDemoMode?: (enabled: boolean) => void;
 }
 
 export default function AuthModal({
@@ -30,12 +49,20 @@ export default function AuthModal({
   onClose,
   currentUser,
   onUserChange,
+  isEvaluationMode,
+  onToggleEvaluationMode,
   demoMode,
   onToggleDemoMode,
 }: AuthModalProps) {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+  const isEval = isEvaluationMode ?? demoMode ?? false;
+  const handleToggleEval = (val: boolean) => {
+    if (onToggleEvaluationMode) onToggleEvaluationMode(val);
+    if (onToggleDemoMode) onToggleDemoMode(val);
+  };
 
   // Supabase Custom Configuration Tab
   const initialConfig = getStoredSupabaseConfig();
@@ -52,7 +79,7 @@ export default function AuthModal({
       return;
     }
     if (!isConfigured) {
-      toast.info("Supabase is running in local-first demo mode. Connecting local profile.");
+      toast.info("Supabase is in local storage mode. Connected locally.");
       onUserChange();
       onClose();
       return;
@@ -73,7 +100,7 @@ export default function AuthModal({
 
   const handleGoogleSignIn = async () => {
     if (!isConfigured) {
-      toast.info("Supabase credentials not configured. Running in local-first demo mode.");
+      toast.info("Supabase credentials not configured. Running in local-first storage mode.");
       return;
     }
     try {
@@ -123,31 +150,36 @@ export default function AuthModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <ShieldCheck className="w-5 h-5 text-primary" />
-            Account & Cloud Settings
+            Account & Operational Access
           </DialogTitle>
           <DialogDescription>
-            Free-tier architecture. Browsing is open to all; sign-in enables verified reports and consensus voting.
+            Open civic architecture. Browsing is open to all; sign in for certified authority credentials or toggle evaluation mode.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue={currentUser ? "account" : "signin"} className="w-full mt-2">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="signin" className="text-xs">Sign In</TabsTrigger>
-            <TabsTrigger value="supabase" className="text-xs">Free Cloud ($0)</TabsTrigger>
-            <TabsTrigger value="guards" className="text-xs">Zero-Cost Guards</TabsTrigger>
+        <Tabs defaultValue="signin" className="w-full mt-2">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin" className="text-xs">
+              Role & Sign In
+            </TabsTrigger>
+            <TabsTrigger value="supabase" className="text-xs">
+              Cloud Infrastructure
+            </TabsTrigger>
           </TabsList>
 
-          {/* SIGN IN TAB */}
+          {/* SIGN IN & ROLE SELECTION TAB */}
           <TabsContent value="signin" className="space-y-4 pt-3">
             {currentUser ? (
               <div className="space-y-4 p-4 rounded-xl bg-muted/50 border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-foreground">{currentUser.fullName || "Citizen"}</p>
+                    <p className="font-semibold text-foreground">
+                      {currentUser.fullName || "Citizen"}
+                    </p>
                     <p className="text-xs text-muted-foreground">{currentUser.email}</p>
                   </div>
                   <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-primary/10 text-primary capitalize">
@@ -155,39 +187,42 @@ export default function AuthModal({
                   </span>
                 </div>
 
-                <div className="pt-2 border-t flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Demo Presentation Mode</span>
-                    <input
-                      type="checkbox"
-                      checked={demoMode}
-                      onChange={(e) => onToggleDemoMode(e.target.checked)}
-                      className="rounded accent-primary w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                  <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full gap-2 mt-2">
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="w-full gap-2 mt-2 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
                 {magicLinkSent ? (
                   <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-2">
                     <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-                    <p className="font-medium text-emerald-800 dark:text-emerald-300">Magic Link Sent</p>
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                      Magic Link Sent
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       Check your email ({email}) and tap the link to sign in.
                     </p>
-                    <Button variant="ghost" size="sm" onClick={() => setMagicLinkSent(false)} className="text-xs">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMagicLinkSent(false)}
+                      className="text-xs cursor-pointer"
+                    >
                       Use a different email
                     </Button>
                   </div>
                 ) : (
                   <form onSubmit={handleMagicLink} className="space-y-3">
                     <div className="space-y-1">
-                      <Label htmlFor="email" className="text-xs">Email Address (Free Magic Link)</Label>
+                      <Label htmlFor="email" className="text-xs">
+                        Email Address (Civic Magic Link)
+                      </Label>
                       <Input
                         id="email"
                         type="email"
@@ -198,9 +233,13 @@ export default function AuthModal({
                         className="h-10"
                       />
                     </div>
-                    <Button type="submit" disabled={isSubmitting} className="w-full h-10 gap-2">
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full h-10 gap-2 cursor-pointer font-bold"
+                    >
                       <Mail className="w-4 h-4" />
-                      {isSubmitting ? "Sending..." : "Send Free Magic Link"}
+                      {isSubmitting ? "Sending..." : "Send Magic Link"}
                     </Button>
                   </form>
                 )}
@@ -218,7 +257,7 @@ export default function AuthModal({
                   type="button"
                   variant="outline"
                   onClick={handleGoogleSignIn}
-                  className="w-full h-10 gap-2 font-medium"
+                  className="w-full h-10 gap-2 font-medium cursor-pointer"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -240,18 +279,65 @@ export default function AuthModal({
                   </svg>
                   Continue with Google
                 </Button>
-
-                <div className="pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Demo Presentation Mode</span>
-                  <input
-                    type="checkbox"
-                    checked={demoMode}
-                    onChange={(e) => onToggleDemoMode(e.target.checked)}
-                    className="rounded accent-primary w-4 h-4 cursor-pointer"
-                  />
-                </div>
               </div>
             )}
+
+            {/* PROFESSIONAL ROLE SWITCHER (WCAG & CIVIC STANDARD) */}
+            <div className="space-y-2 pt-3 border-t border-border">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground">Operational Role</Label>
+                <Badge
+                  variant={isEval ? "default" : "secondary"}
+                  className="text-[10px] font-mono"
+                >
+                  {isEval ? "Authority Level Access" : "Guest Citizen"}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleToggleEval(false)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    !isEval
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40 text-foreground font-semibold"
+                      : "border-border bg-card/60 hover:bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-primary" />
+                      Guest Citizen
+                    </span>
+                    {!isEval && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 leading-tight">
+                    Real-time flood maps, crowd reporting, and evacuation routing.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleEval(true)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    isEval
+                      ? "border-sky-600 bg-sky-600/10 ring-1 ring-sky-600/40 text-foreground font-semibold"
+                      : "border-border bg-card/60 hover:bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-sky-600" />
+                      Municipal Authority
+                    </span>
+                    {isEval && <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" />}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 leading-tight">
+                    Evaluation Mode: Control Room, incident verification & road closures.
+                  </p>
+                </button>
+              </div>
+            </div>
           </TabsContent>
 
           {/* SUPABASE CLOUD TAB */}
@@ -259,10 +345,10 @@ export default function AuthModal({
             <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs text-sky-900 dark:text-sky-200">
               <p className="font-semibold flex items-center gap-1.5">
                 <Database className="w-3.5 h-3.5" />
-                100% Free Supabase Backend
+                Supabase Backend Configuration
               </p>
               <p className="mt-1">
-                You can connect your own free Supabase project (500 MB database, 1 GB storage, free auth). The app operates directly from the browser.
+                Connect your organization&apos;s Supabase project for synchronized live incident broadcasts and persistent incident records.
               </p>
             </div>
 
@@ -294,73 +380,10 @@ export default function AuthModal({
                 type="button"
                 onClick={handleSaveSupabaseConfig}
                 disabled={isTestingConfig}
-                className="w-full h-9 gap-2"
+                className="w-full text-xs font-bold h-9 cursor-pointer"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                {isTestingConfig ? "Testing connection..." : "Connect Supabase Database"}
+                {isTestingConfig ? "Testing Connection..." : "Save & Verify Connection"}
               </Button>
-
-              <div className="p-2.5 rounded bg-muted text-[11px] text-muted-foreground space-y-1">
-                <p className="font-semibold text-foreground">3 Steps to Connect Free Supabase:</p>
-                <p>1. Go to supabase.com and create a free project.</p>
-                <p>2. In SQL Editor, run `supabase/migrations/20261101_init_streetflood.sql`.</p>
-                <p>3. Copy Project URL and `anon` key from Project Settings → API.</p>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* ZERO-COST ARCHITECTURAL GUARDS TAB */}
-          <TabsContent value="guards" className="space-y-3 pt-3 text-xs">
-            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 dark:text-emerald-200 space-y-1">
-              <p className="font-bold flex items-center gap-1.5 text-sm text-emerald-800 dark:text-emerald-300">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Guaranteed $0.00 / month Operating Cost
-              </p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Structural code guards prevent any accidental spending, paid API calls, or database quota breaches.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
-                <span className="text-base shrink-0">🛡️</span>
-                <div>
-                  <p className="font-semibold text-foreground text-[11px]">Domain Whitelist Firewall</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    All outbound requests are restricted strictly to free open datasets (OpenStreetMap, Open-Meteo, OSRM). Any call to paid map services or payment gateways is blocked at the code level.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
-                <span className="text-base shrink-0">💾</span>
-                <div>
-                  <p className="font-semibold text-foreground text-[11px]">Storage Quota Compression Guard</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Citizen upload photos are compressed in-browser to ≤350 KB before transmission, ensuring media never overflows the free 1 GB storage bucket.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
-                <span className="text-base shrink-0">⚡</span>
-                <div>
-                  <p className="font-semibold text-foreground text-[11px]">Fair-Use Rate Limiter</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Rate limits submissions to max 5 reports per hour per citizen. Prevents spam and protects the 500 MB free database quota.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-lg border bg-card flex items-start gap-2.5">
-                <span className="text-base shrink-0">🔄</span>
-                <div>
-                  <p className="font-semibold text-foreground text-[11px]">Automated 6-Hour Report Purge</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Reports auto-expire after 6 hours and are pruned from active calculation so storage never bloats over time.
-                  </p>
-                </div>
-              </div>
             </div>
           </TabsContent>
         </Tabs>

@@ -2,7 +2,7 @@ export async function registerStreetFloodServiceWorker(baseUrl = "/") {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
   const registration = await navigator.serviceWorker.register(`${baseUrl.replace(/\/?$/, "/")}sw.js`);
   try {
-    await registration.sync?.register("streetflood-report-sync");
+    await (registration as unknown as { sync?: { register: (tag: string) => Promise<void> } }).sync?.register("streetflood-report-sync");
   } catch {
     // Background sync is optional; the application also flushes on online events.
   }

@@ -141,6 +141,9 @@ export interface RealWeatherResult {
   hourlyRainMm: number[];
   temperatureC?: number;
   weatherCode?: number;
+  retrievedAt?: string;
+  sourceStatus?: "live" | "cached" | "unavailable";
+  sourceName?: string;
 }
 
 export async function fetchRealWeather(lat: number, lng: number): Promise<RealWeatherResult> {
@@ -150,7 +153,12 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
   const cacheKey = `weather_${snapLat}_${snapLng}`;
 
   const cached = getCached<RealWeatherResult>(cacheKey, 15 * 60 * 1000);
-  if (cached) return cached;
+  if (cached) {
+    return {
+      ...cached,
+      sourceStatus: "cached",
+    };
+  }
 
   try {
     const url = `${OPEN_METEO_BASE}?latitude=${snapLat}&longitude=${snapLng}&hourly=precipitation,rain&current=precipitation,rain,temperature_2m,weather_code&forecast_hours=6&past_hours=2&timezone=auto`;
@@ -181,6 +189,9 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
       hourlyRainMm: rainArr.slice(Math.max(0, currentIdx - 1), currentIdx + 5),
       temperatureC: json.current?.temperature_2m,
       weatherCode: json.current?.weather_code,
+      retrievedAt: new Date().toISOString(),
+      sourceStatus: "live",
+      sourceName: "Open-Meteo Precipitation Model",
     };
 
     setCached(cacheKey, result);
@@ -193,6 +204,9 @@ export async function fetchRealWeather(lat: number, lng: number): Promise<RealWe
       forecastRain3hMm: 0,
       hourlyTimes: [],
       hourlyRainMm: [],
+      retrievedAt: new Date().toISOString(),
+      sourceStatus: "unavailable",
+      sourceName: "Telemetry Offline",
     };
   }
 }
@@ -472,7 +486,48 @@ export async function calculateWorldwideSafeRoute(
       provider: "OSRM",
     };
   } catch (err) {
-    console.warn("OSRM routing failed, fallback to straight corridor line:", err);
-    return null;
+    console.warn("OSRM routing failed, generating transparent direct corridor fallback:", err);
+    const dLat = ((destination[0] - start[0]) * Math.PI) / 180;
+    const dLng = ((destination[1] - start[1]) * Math.PI) / 180;
+    const lat1 = (start[0] * Math.PI) / 180;
+    const lat2 = (destination[0] * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    const distKm = 6371 * 2 * Math.asin(Math.sqrt(a));
+    const speedKmH = mode === "pedestrian" ? 4.5 : 20;
+
+    const coords: [number, number][] = [];
+    for (let i = 0; i <= 6; i++) {
+      const f = i / 6;
+      coords.push([
+        Number((start[0] + (destination[0] - start[0]) * f).toFixed(6)),
+        Number((start[1] + (destination[1] - start[1]) * f).toFixed(6)),
+      ]);
+    }
+
+    return {
+      coordinates: coords,
+      distanceKm: Math.round(distKm * 10) / 10,
+      durationMinutes: Math.max(1, Math.round((distKm / speedKmH) * 60)),
+      steps: [
+        {
+          instruction: "Follow direct corridor towards shelter",
+          streetName: "Major elevated avenues (Direct Corridor)",
+          distanceMeters: Math.round(distKm * 1000),
+          durationSeconds: Math.round((distKm / speedKmH) * 3600),
+        },
+      ],
+      safetyScore: 50,
+      safetyStatus: "Caution",
+      safetyMessage: "Direct evacuation corridor vector (OSRM road geometry service unavailable). Navigate via highest elevation paved thoroughfares.",
+      blockedByClosure: undefined,
+      counts: {
+        Low: 0,
+        Moderate: 1,
+        High: 0,
+        Critical: 0,
+      },
+      dangerWarnings: ["Turn-by-turn road geometry unavailable offline. Confirm road accessibility ahead."],
+      provider: "CorridorFallback",
+    };
   }
 }
