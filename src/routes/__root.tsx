@@ -79,14 +79,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1" },
-      { title: "StreetFlood Live – Street-Level Flood Monitoring & Early Warning" },
+      { title: "StreetFlood AI — Hyperlocal Flood Intelligence and Evacuation Platform" },
       {
         name: "description",
         content:
           "Hyperlocal street-level flood monitoring map, crowdsourced reports, safe routing, predictive early warnings, and emergency evacuation assistance.",
       },
-      { name: "author", content: "StreetFlood Live" },
-      { property: "og:title", content: "StreetFlood Live" },
+      { name: "author", content: "StreetFlood AI" },
+      { property: "og:title", content: "StreetFlood AI" },
       {
         property: "og:description",
         content: "Street-level flood monitoring, safe routing, and predictive early warnings.",

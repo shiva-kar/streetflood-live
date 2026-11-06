@@ -29,7 +29,7 @@ import {
   type AgenticQueryResponse,
   type AgentAction,
 } from "@/lib/ai/bengaluruAgent";
-import type { FloodReport, RoadIncident } from "@/lib/flood/types";
+import type { FloodReport, RoadIncident, Shelter } from "@/lib/flood/types";
 import type { RealWeatherResult } from "@/lib/flood/openData";
 
 export interface CivicAiAssistantProps {
@@ -39,6 +39,7 @@ export interface CivicAiAssistantProps {
   weather: RealWeatherResult | null;
   reports: FloodReport[];
   incidents: RoadIncident[];
+  shelters?: Shelter[];
   onExecuteAction: (action: AgentAction) => void;
   activeCityName?: string;
 }
@@ -60,19 +61,19 @@ const QUICK_PROMPTS = [
     query: "Where is the nearest emergency relief shelter?",
   },
   {
-    label: "Koramangala 80ft Road condition",
-    labelKn: "ಕೋರಮಂಗಲ 80 ಅಡಿ ರಸ್ತೆ ಪರಿಸ್ಥಿತಿ",
-    query: "Is Koramangala 80ft Road flooded?",
+    label: "Why is a road classified as Critical?",
+    labelKn: "ರಸ್ತೆಯನ್ನು ಕ್ರಿಟಿಕಲ್ ಎಂದು ಏಕೆ ವರ್ಗೀಕರಿಸಲಾಗಿದೆ?",
+    query: "Why is this road classified as Critical risk?",
+  },
+  {
+    label: "What should I prepare before evacuating?",
+    labelKn: "ಸ್ಥಳಾಂತರಕ್ಕೆ ಮುನ್ನ ಏನು ಸಿದ್ಧಪಡಿಸಬೇಕು?",
+    query: "What should I prepare before evacuating?",
   },
   {
     label: "Emergency civic helplines",
     labelKn: "ತುರ್ತು ಸಹಾಯವಾಣಿ",
     query: "What are the official disaster helpline numbers?",
-  },
-  {
-    label: "Sion Circle & LBS Marg road condition",
-    labelKn: "ಸಯಾನ್ ಸರ್ಕಲ್ & ಎಲ್‌ಬಿಎಸ್ ಮಾರ್ಗ ಪರಿಸ್ಥಿತಿ",
-    query: "Is Sion Circle or LBS Marg waterlogged right now?",
   },
 ];
 
@@ -83,8 +84,9 @@ export default function CivicAiAssistant({
   weather,
   reports,
   incidents,
+  shelters = [],
   onExecuteAction,
-  activeCityName = "Mumbai",
+  activeCityName = "Bengaluru",
 }: CivicAiAssistantProps) {
   const [query, setQuery] = useState("");
   const [currentResponse, setCurrentResponse] = useState<AgenticQueryResponse | null>(null);
@@ -100,6 +102,7 @@ export default function CivicAiAssistant({
         weather,
         reports,
         incidents,
+        shelters,
         activeCityName,
       });
       setCurrentResponse(res);
@@ -274,6 +277,22 @@ export default function CivicAiAssistant({
                   )}
                 </div>
               </div>
+
+              {/* DATA GROUNDING & TRUST */}
+              {currentResponse.dataGrounding && (
+                <div className="rounded-xl border bg-card p-2.5 text-[10px] text-muted-foreground space-y-1">
+                  <div className="flex items-center justify-between font-semibold text-foreground">
+                    <span>Data Grounding &amp; Real-Time Sources</span>
+                    <ShieldAlert className="w-3 h-3 text-emerald-600" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 pt-0.5">
+                    <div>Telemetry: <strong className="text-foreground">{currentResponse.dataGrounding.telemetrySource}</strong></div>
+                    <div>Shelters Queried: <strong className="text-foreground">{currentResponse.dataGrounding.verifiedSheltersQueried} verified</strong></div>
+                    <div>Reports Corroborated: <strong className="text-foreground">{currentResponse.dataGrounding.activeReportsCorroborated}</strong></div>
+                    <div>Closures Checked: <strong className="text-foreground">{currentResponse.dataGrounding.activeClosuresChecked}</strong></div>
+                  </div>
+                </div>
+              )}
 
               {/* ACTION BUTTONS */}
               {currentResponse.suggestedActions.length > 0 && (

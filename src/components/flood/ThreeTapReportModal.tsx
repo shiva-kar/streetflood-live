@@ -1,12 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Camera, X, Check, WifiOff, Sparkles } from "lucide-react";
-import { fileToCompactDataUrl } from "@/lib/flood/store";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Camera, X, Check, WifiOff, Sparkles, AlertTriangle, ShieldCheck } from "lucide-react";
 import { submitLiveReport } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import type { FloodReport, WaterDepth } from "@/lib/flood/types";
+import type { RealWeatherResult } from "@/lib/flood/openData";
+import { analyzeCitizenReport, recordWorkflowStep } from "@/lib/ai/agenticWorkflow";
+import { recordImpactEvent } from "@/lib/flood/impactTracker";
 import { toast } from "sonner";
 
 interface ThreeTapReportModalProps {
@@ -14,6 +17,8 @@ interface ThreeTapReportModalProps {
   onClose: () => void;
   userCoords: [number, number];
   locationAddressText?: string;
+  existingReports?: FloodReport[];
+  weather?: RealWeatherResult | null;
   onReportCreated: (newReport: FloodReport) => void;
 }
 
@@ -59,6 +64,8 @@ export default function ThreeTapReportModal({
   onClose,
   userCoords,
   locationAddressText,
+  existingReports = [],
+  weather = null,
   onReportCreated,
 }: ThreeTapReportModalProps) {
   const t = useI18n();
@@ -67,6 +74,21 @@ export default function ThreeTapReportModal({
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Real-Time AI Pre-Analysis
+  const aiAnalysis = useMemo(() => {
+    return analyzeCitizenReport(
+      {
+        id: "draft_report",
+        lat: userCoords[0],
+        lng: userCoords[1],
+        waterDepth: depth,
+        description,
+      },
+      existingReports,
+      weather
+    );
+  }, [userCoords, depth, description, existingReports, weather]);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -127,6 +149,23 @@ export default function ThreeTapReportModal({
       });
 
       if (created) {
+        // Record Controlled Agentic Workflow Audit steps
+        recordWorkflowStep({
+          reportId: created.id,
+          stage: "CitizenReported",
+          actor: "Citizen",
+          details: `Submitted ${depth} report at [${userCoords[0].toFixed(4)}, ${userCoords[1].toFixed(4)}].`,
+        });
+
+        recordWorkflowStep({
+          reportId: created.id,
+          stage: "AiAnalyzed",
+          actor: "IBM Bob Agentic Core",
+          details: `Classified as "${aiAnalysis.incidentCategory}". Confidence: ${aiAnalysis.anomalyAssessment.confidenceScore}%. Road: ${aiAnalysis.identifiedRoadOrLandmark}.`,
+        });
+
+        recordImpactEvent("report_submitted");
+
         onReportCreated(created);
         toast.success(t.reportSuccess);
         onClose();
@@ -156,9 +195,9 @@ export default function ThreeTapReportModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-1">
+        <div className="space-y-3.5 pt-1">
           {/* TAP 1: LOCATION AUTO-ACQUIRED */}
-          <div className="p-3 rounded-xl bg-muted/60 border flex items-center justify-between text-xs">
+          <div className="p-2.5 rounded-xl bg-muted/60 border flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 min-w-0">
               <MapPin className="w-4 h-4 text-primary shrink-0" />
               <div className="truncate">
@@ -170,17 +209,17 @@ export default function ThreeTapReportModal({
                 </p>
               </div>
             </div>
-            <span className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full shrink-0">
               GPS Locked
             </span>
           </div>
 
           {/* TAP 2: SELECT WATER DEPTH */}
           <div>
-            <label className="text-xs font-semibold text-foreground block mb-2">
+            <label className="text-xs font-semibold text-foreground block mb-1.5">
               {t.waterDepth}
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2">
               {DEPTH_CARDS.map((card) => {
                 const isSelected = depth === card.depth;
                 return (
@@ -188,16 +227,16 @@ export default function ThreeTapReportModal({
                     key={card.depth}
                     type="button"
                     onClick={() => setDepth(card.depth)}
-                    className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between min-h-[82px] cursor-pointer ${card.colorClass} ${
+                    className={`p-2.5 rounded-xl border text-left transition-all relative flex flex-col justify-between min-h-[76px] cursor-pointer ${card.colorClass} ${
                       isSelected
                         ? "border-primary ring-2 ring-primary/30 bg-primary/5 shadow-sm"
                         : "opacity-85 hover:opacity-100"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl">{card.icon}</span>
+                      <span className="text-xl">{card.icon}</span>
                       {isSelected && (
-                        <div className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                        <div className="w-3.5 h-3.5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                         </div>
                       )}
@@ -216,7 +255,7 @@ export default function ThreeTapReportModal({
             </div>
           </div>
 
-          {/* TAP 3: OPTIONAL PHOTO + SUBMIT */}
+          {/* TAP 3: OPTIONAL PHOTO & DESCRIPTION */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-foreground">{t.addPhoto}</span>
@@ -241,8 +280,8 @@ export default function ThreeTapReportModal({
             />
 
             {photoDataUrl ? (
-              <div className="relative rounded-lg overflow-hidden border max-h-36 bg-black flex items-center justify-center">
-                <img src={photoDataUrl} alt="Flood preview" className="object-contain max-h-36 w-full" />
+              <div className="relative rounded-lg overflow-hidden border max-h-32 bg-black flex items-center justify-center">
+                <img src={photoDataUrl} alt="Flood preview" className="object-contain max-h-32 w-full" />
               </div>
             ) : (
               <Button
@@ -250,20 +289,51 @@ export default function ThreeTapReportModal({
                 variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-9 border-dashed text-xs gap-2"
+                className="w-full h-8 border-dashed text-xs gap-2"
               >
-                <Camera className="w-4 h-4 text-muted-foreground" />
-                Take Photo or Choose File
+                <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>Take Photo or Choose File (Metadata Stripped)</span>
               </Button>
             )}
 
             <Textarea
-              placeholder={t.optionalNote}
+              placeholder={t.optionalNote || "Describe street landmarks, stalled vehicles, or blocked drains..."}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="h-16 text-xs resize-none"
+              className="h-14 text-xs resize-none"
               maxLength={200}
             />
+          </div>
+
+          {/* AI PRE-ANALYSIS PILL (IBM Bob & watsonx Core) */}
+          <div className="p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/5 space-y-1.5 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-sky-700 dark:text-sky-300">
+                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                <span>AI Pre-Analysis</span>
+              </div>
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-sky-500/40 text-sky-600">
+                {aiAnalysis.anomalyAssessment.confidenceScore}% Confidence
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div>
+                <span className="text-muted-foreground">Category: </span>
+                <strong className="text-foreground">{aiAnalysis.incidentCategory}</strong>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Road: </span>
+                <strong className="text-foreground truncate">{aiAnalysis.identifiedRoadOrLandmark}</strong>
+              </div>
+            </div>
+
+            {aiAnalysis.duplicateRisk.isPotentialDuplicate && (
+              <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-700 dark:text-amber-300 flex items-start gap-1">
+                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
+                <span>{aiAnalysis.duplicateRisk.reason}</span>
+              </div>
+            )}
           </div>
 
           {/* SUBMIT BUTTON */}
@@ -271,7 +341,7 @@ export default function ThreeTapReportModal({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md gap-2"
+            className="w-full h-10 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-md gap-2 cursor-pointer"
           >
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
             {isSubmitting ? t.submitting : t.submitReport}

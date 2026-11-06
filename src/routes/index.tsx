@@ -38,6 +38,9 @@ import { MAP_CENTER, SHELTERS as INITIAL_SHELTERS } from "@/lib/flood/data";
 import { NavigationHUD } from "@/components/routing/NavigationHUD";
 import ShelterDetailsModal from "@/components/flood/ShelterDetailsModal";
 import CivicAiAssistant from "@/components/flood/CivicAiAssistant";
+import HackathonShowcaseModal from "@/components/flood/HackathonShowcaseModal";
+import ImpactDashboardModal from "@/components/flood/ImpactDashboardModal";
+import { recordImpactEvent } from "@/lib/flood/impactTracker";
 import type { AgentAction } from "@/lib/ai/bengaluruAgent";
 import NearbySheltersDrawer from "@/components/flood/NearbySheltersDrawer";
 import { reverseGeocode } from "@/lib/reporting/reverseGeocoder";
@@ -103,11 +106,11 @@ function getInitialCivicLocation(): { pos: [number, number]; zoom: number; cityN
       // Ignore storage errors
     }
   }
-  // Default to flagship Mumbai Sion-Kurla Corridor (936 OSM segments & densest hydrological data)
+  // Default to flagship Bengaluru Tech Corridors (IBM Bobathon Build for Bengaluru)
   return {
-    pos: MUMBAI_CORRIDOR_CENTER,
-    zoom: 14,
-    cityName: "Mumbai (Sion-Kurla Corridor)",
+    pos: BENGALURU_CENTER,
+    zoom: 13,
+    cityName: "Bengaluru (Tech Corridors)",
   };
 }
 
@@ -205,6 +208,8 @@ export default function StreetFloodApp() {
   const [controlRoomOpen, setControlRoomOpen] = useState(false);
   const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
   const [civicAssistantOpen, setCivicAssistantOpen] = useState(false);
+  const [hackathonShowcaseOpen, setHackathonShowcaseOpen] = useState(false);
+  const [impactDashboardOpen, setImpactDashboardOpen] = useState(false);
 
   // 1. Initial User Geolocation
   useEffect(() => {
@@ -486,6 +491,7 @@ export default function StreetFloodApp() {
 
   const handlePlanRouteToShelter = async (shelter: Shelter) => {
     setHighlightShelterId(shelter.id);
+    recordImpactEvent("shelter_viewed");
     toast.loading("Calculating safest road route avoiding flood areas...", { id: "routing" });
     const blocked = liveIncidents
       .filter((i): i is RoadIncident & { lat: number; lng: number } => typeof i.lat === "number" && typeof i.lng === "number")
@@ -498,6 +504,7 @@ export default function StreetFloodApp() {
     const result = await calculateWorldwideSafeRoute(referenceCoord, [shelter.lat, shelter.lng], blocked, evacuationMode);
     toast.dismiss("routing");
     if (result) {
+      recordImpactEvent("route_calculated");
       setRoadRoute(result);
       toast.success(`Safe evacuation route calculated: ${result.distanceKm} km (~ ${result.durationMinutes} min)`);
     } else {
@@ -600,6 +607,8 @@ export default function StreetFloodApp() {
         offlineQueuedCount={offlineQueuedCount}
         activeCityName={activeCityName}
         onOpenCivicAssistant={() => setCivicAssistantOpen(true)}
+        onOpenHackathonShowcase={() => setHackathonShowcaseOpen(true)}
+        onOpenImpactDashboard={() => setImpactDashboardOpen(true)}
       />
 
       {/* 2. FULLSCREEN MAP */}
@@ -676,6 +685,8 @@ export default function StreetFloodApp() {
         isNationalView={viewportBounds.zoom < 11}
         onSelectCity={(city, lat, lng) => handleSelectPlace(lat, lng, city)}
         onOpenCivicAssistant={() => setCivicAssistantOpen(true)}
+        onOpenHackathonShowcase={() => setHackathonShowcaseOpen(true)}
+        onOpenImpactDashboard={() => setImpactDashboardOpen(true)}
       />
 
       {/* 4. BOTTOM 4-TAB NAVIGATION DOCK */}
@@ -698,6 +709,8 @@ export default function StreetFloodApp() {
         open={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
         userCoords={userPos}
+        existingReports={liveReports}
+        weather={weather}
         onReportCreated={handleReportCreated}
       />
 
@@ -723,11 +736,31 @@ export default function StreetFloodApp() {
         incidents={liveIncidents}
         alerts={activeAlerts}
         mapCenter={[viewportBounds.centerLat, viewportBounds.centerLng]}
+        weather={weather}
+        shelters={shelters}
         onVerifyReport={handleVerifyReport}
         onDismissReport={handleDismissReport}
         onAddIncident={handleAddIncident}
         onRemoveIncident={handleRemoveIncident}
         onAddAlert={handleAddAlert}
+      />
+
+      <HackathonShowcaseModal
+        open={hackathonShowcaseOpen}
+        onClose={() => setHackathonShowcaseOpen(false)}
+        onJumpToCorridor={handleSelectPlace}
+        onOpenReportModal={() => setReportModalOpen(true)}
+        onOpenControlRoom={() => setControlRoomOpen(true)}
+        onOpenCivicAssistant={() => setCivicAssistantOpen(true)}
+        onOpenImpactDashboard={() => setImpactDashboardOpen(true)}
+      />
+
+      <ImpactDashboardModal
+        open={impactDashboardOpen}
+        onClose={() => setImpactDashboardOpen(false)}
+        reports={liveReports}
+        incidents={liveIncidents}
+        shelters={shelters}
       />
 
       <ShelterDetailsModal
@@ -769,6 +802,7 @@ export default function StreetFloodApp() {
         weather={weather}
         reports={liveReports}
         incidents={liveIncidents}
+        shelters={shelters}
         onExecuteAction={handleExecuteAgentAction}
         activeCityName={activeCityName}
       />

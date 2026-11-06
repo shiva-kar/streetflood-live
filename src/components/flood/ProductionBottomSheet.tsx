@@ -28,6 +28,8 @@ import { speakTurnInstruction, cancelVoiceAnnouncements } from "@/lib/flood/voic
 
 interface ProductionBottomSheetProps {
   onOpenCivicAssistant?: () => void;
+  onOpenHackathonShowcase?: () => void;
+  onOpenImpactDashboard?: () => void;
   onOpenIbmBobShowcase?: () => void;
   onOpenIbmBobCopilot?: () => void;
   currentTile: Tile | null;
@@ -73,6 +75,8 @@ export default function ProductionBottomSheet({
   activeCityName,
   isNationalView = false,
   onSelectCity,
+  onOpenHackathonShowcase,
+  onOpenImpactDashboard,
   onOpenIbmBobShowcase,
   onOpenCivicAssistant,
   onOpenIbmBobCopilot,
@@ -245,6 +249,30 @@ export default function ProductionBottomSheet({
               <ArrowRight className="w-3.5 h-3.5 text-sky-600 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
+        </div>
+      )}
+
+      {/* QUICK SHOWCASE & IMPACT SHORTCUTS */}
+      {(onOpenHackathonShowcase || onOpenIbmBobShowcase || onOpenImpactDashboard) && (
+        <div className={`px-4 pt-1.5 flex gap-2 ${desktopCollapsed ? "sm:hidden" : ""}`}>
+          {(onOpenHackathonShowcase || onOpenIbmBobShowcase) && (
+            <button
+              type="button"
+              onClick={onOpenHackathonShowcase || onOpenIbmBobShowcase}
+              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-sky-500/25 bg-sky-500/5 hover:bg-sky-500/15 text-[11px] font-semibold text-sky-700 dark:text-sky-300 transition-colors cursor-pointer"
+            >
+              <span>Build for Bengaluru</span>
+            </button>
+          )}
+          {onOpenImpactDashboard && (
+            <button
+              type="button"
+              onClick={onOpenImpactDashboard}
+              className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-muted/40 hover:bg-muted text-[11px] font-medium text-foreground transition-colors cursor-pointer"
+            >
+              <span>Impact Metrics</span>
+            </button>
+          )}
         </div>
       )}
 

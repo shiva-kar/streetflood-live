@@ -12,6 +12,8 @@ import {
   Bell,
   Volume2,
   Bot,
+  BarChart3,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,8 @@ export interface ProductionHeaderProps {
   reports?: import("@/lib/flood/types").FloodReport[];
   offlineQueuedCount?: number;
   onOpenCivicAssistant?: () => void;
+  onOpenHackathonShowcase?: () => void;
+  onOpenImpactDashboard?: () => void;
   /** Deprecated alias */
   demoMode?: boolean;
   /** Deprecated alias */
@@ -65,6 +69,9 @@ export default function ProductionHeader({
   criticalAlert,
   activeCityName,
   onOpenCivicAssistant,
+  onOpenHackathonShowcase,
+  onOpenImpactDashboard,
+  onOpenIbmBobShowcase,
   onOpenIbmBobCopilot,
 }: ProductionHeaderProps) {
   const t = useI18n();
@@ -76,6 +83,7 @@ export default function ProductionHeader({
   const currentLang = getLanguage();
 
   const handleOpenAi = onOpenCivicAssistant || onOpenIbmBobCopilot;
+  const handleOpenShowcase = onOpenHackathonShowcase || onOpenIbmBobShowcase;
 
   // Debounced search
   useEffect(() => {
@@ -115,11 +123,11 @@ export default function ProductionHeader({
       <div className="flex items-center gap-2 w-full">
         {/* LOGO & BRAND WITH 1-CLICK CORRIDOR SWITCHER */}
         <div className="flex items-center gap-2 shrink-0 rounded-xl border border-border bg-background/95 px-2.5 py-2 shadow-sm backdrop-blur-md sm:px-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-600 text-xs font-black text-white">
             SF
           </div>
           <span className="hidden text-sm font-bold tracking-tight text-foreground sm:inline">
-            StreetFlood<span className="text-primary font-normal">.Live</span>
+            StreetFlood<span className="text-sky-600 font-extrabold">.AI</span>
           </span>
 
           {/* 1-CLICK FLAGSHIP CORRIDOR SWITCHER */}
@@ -128,33 +136,19 @@ export default function ProductionHeader({
               <button
                 type="button"
                 className="ml-0.5 hidden border-l border-border/80 pl-2 text-[10px] font-semibold text-muted-foreground hover:text-foreground md:flex items-center gap-1 cursor-pointer transition-colors"
-                title="Switch Flagship Corridor"
+                title="Switch Monitored Corridor"
               >
                 <span className="truncate max-w-[130px]">
                   {activeCityName
                     ? activeCityName
                         .replace(" (Sion-Kurla Corridor)", "")
                         .replace(" (Tech Corridors)", "")
-                    : "Mumbai"}
+                    : "Bengaluru"}
                 </span>
-                <span className="text-[9px] text-primary">▼</span>
+                <span className="text-[9px] text-sky-600">▼</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64 p-1.5 shadow-xl">
-              <DropdownMenuItem
-                onClick={() => onSelectPlace(19.0508, 72.8714, "Mumbai (Sion-Kurla Corridor)")}
-                className="flex flex-col items-start gap-0.5 cursor-pointer rounded-lg p-2 hover:bg-muted"
-              >
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-primary" />
-                  <span className="font-bold text-xs text-foreground">
-                    Mumbai (Monsoon Corridor)
-                  </span>
-                </div>
-                <span className="text-[10px] text-muted-foreground pl-5">
-                  936 OSM road segments & Sion-Kurla micro-grid
-                </span>
-              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => onSelectPlace(12.9716, 77.5946, "Bengaluru (Tech Corridors)")}
                 className="flex flex-col items-start gap-0.5 cursor-pointer rounded-lg p-2 hover:bg-muted"
@@ -166,7 +160,21 @@ export default function ProductionHeader({
                   </span>
                 </div>
                 <span className="text-[10px] text-muted-foreground pl-5">
-                  Outer Ring Road, Silk Board & BBMP shelters
+                  Outer Ring Road, Silk Board &amp; 269 BBMP shelters
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSelectPlace(19.0508, 72.8714, "Mumbai (Sion-Kurla Corridor)")}
+                className="flex flex-col items-start gap-0.5 cursor-pointer rounded-lg p-2 hover:bg-muted"
+              >
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-bold text-xs text-foreground">
+                    Mumbai (Monsoon Corridor)
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground pl-5">
+                  936 OSM road segments &amp; Sion-Kurla micro-grid
                 </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -249,16 +257,43 @@ export default function ProductionHeader({
           )}
         </Button>
 
+        {/* HACKATHON SHOWCASE BUTTON */}
+        {handleOpenShowcase && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenShowcase}
+            className="hidden md:inline-flex h-11 shrink-0 gap-1.5 rounded-xl border border-sky-500/40 bg-gradient-to-r from-sky-500/15 to-indigo-500/15 px-3 text-xs font-bold text-foreground shadow-sm backdrop-blur-md hover:bg-sky-500/25 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <span className="hidden lg:inline">Build for Bengaluru</span>
+            <span className="lg:hidden">Showcase</span>
+          </Button>
+        )}
+
+        {/* IMPACT DASHBOARD BUTTON */}
+        {onOpenImpactDashboard && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenImpactDashboard}
+            className="hidden lg:inline-flex h-11 shrink-0 gap-1.5 rounded-xl border border-border bg-background/95 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur-md hover:bg-muted cursor-pointer"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Impact</span>
+          </Button>
+        )}
+
         {/* CIVIC AI ASSISTANT BUTTON (DESKTOP) */}
         {handleOpenAi && (
           <Button
             variant="outline"
             size="sm"
             onClick={handleOpenAi}
-            className="hidden lg:inline-flex h-11 shrink-0 gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur-md hover:bg-sky-500/20 cursor-pointer"
+            className="hidden xl:inline-flex h-11 shrink-0 gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur-md hover:bg-sky-500/20 cursor-pointer"
           >
             <Bot className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-            <span className="hidden xl:inline">Civic AI</span>
+            <span>Civic AI</span>
           </Button>
         )}
 
